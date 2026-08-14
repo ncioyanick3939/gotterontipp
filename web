@@ -1,1073 +1,718 @@
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Home, Swords, Brain, Trophy, User, Clock, Lock, Flame, Heart,
-  TrendingUp, TrendingDown, Users, Check, X, ChevronRight, Star,
-  ArrowLeft, Wallet, Shield, Target, Award, Zap, Plus, Minus, Circle,
-} from "lucide-react";
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>HockeyPool Schweiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{
+    --ink:#0A0E1A; --surface:#141C2E; --elevated:#1B2438; --line:#26314A;
+    --text:#E8EDF5; --muted:#8B96A9; --faint:#5C6579;
+    --red:#E23744; --red-soft:rgba(226,55,68,.14);
+    --ice:#38BDF8; --ice-soft:rgba(56,189,248,.14);
+    --gold:#F5A623; --green:#2FBF71; --green-soft:rgba(47,191,113,.14);
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{background:var(--ink); color:var(--text); font-family:'Inter',system-ui,-apple-system,sans-serif;}
+  body{overscroll-behavior:none;}
+  #root{max-width:460px; margin:0 auto; min-height:100vh; background:var(--ink); position:relative; box-shadow:0 0 80px rgba(0,0,0,.5);}
+  .mono{font-family:'Barlow Condensed','Inter',sans-serif; font-feature-settings:"tnum"; letter-spacing:.5px;}
+  .eyebrow{font-size:11px; text-transform:uppercase; letter-spacing:1.6px; color:var(--muted); font-weight:600;}
+  .app{padding:0 0 92px 0;}
+  /* Header */
+  .topbar{position:sticky; top:0; z-index:30; background:linear-gradient(180deg,rgba(10,14,26,.98),rgba(10,14,26,.86)); backdrop-filter:blur(12px); border-bottom:1px solid var(--line); padding:14px 18px; display:flex; align-items:center; justify-content:space-between;}
+  .brand{display:flex; align-items:center; gap:9px; font-weight:700; font-size:16px; letter-spacing:-.2px;}
+  .brand .puck{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--red),#a01722);display:grid;place-items:center;font-size:15px;}
+  .balance-chip{display:flex;align-items:center;gap:7px;background:var(--elevated);border:1px solid var(--line);padding:7px 12px;border-radius:999px;font-weight:600;font-size:13px;}
+  .balance-chip .dot{width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);}
+  /* Cards */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;}
+  .section{padding:16px 16px 4px;}
+  .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .section-head h2{font-size:17px;font-weight:700;letter-spacing:-.3px;}
+  .link{color:var(--ice);font-size:13px;font-weight:600;background:none;border:none;cursor:pointer;}
+  /* Next game hero */
+  .hero{margin:16px;border-radius:22px;overflow:hidden;position:relative;background:radial-gradient(120% 100% at 50% 0%,#1c2740 0%,#0f1626 60%);border:1px solid var(--line);}
+  .hero-inner{padding:20px 18px;}
+  .hero-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .pill{font-size:11px;font-weight:600;padding:5px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:5px;letter-spacing:.3px;}
+  .pill.open{background:var(--green-soft);color:var(--green);}
+  .pill.locked{background:var(--red-soft);color:var(--red);}
+  .pill.live{background:var(--red);color:#fff;}
+  .pill.done{background:var(--elevated);color:var(--muted);}
+  .matchup{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;}
+  .team-col{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;}
+  .crest{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font-size:28px;border:1px solid rgba(255,255,255,.1);}
+  .team-name{font-size:13px;font-weight:600;line-height:1.1;}
+  .team-sub{font-size:11px;color:var(--muted);}
+  .vs{font-family:'Barlow Condensed';font-size:20px;color:var(--muted);font-weight:600;}
+  .score{font-family:'Barlow Condensed';font-size:40px;font-weight:700;line-height:1;}
+  .countdown{margin-top:18px;text-align:center;}
+  .cd-time{font-family:'Barlow Condensed';font-size:34px;font-weight:700;letter-spacing:2px;color:var(--text);}
+  .cd-time.hot{color:var(--red);}
+  .btn{width:100%;border:none;border-radius:14px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:transform .08s ease,filter .15s ease;}
+  .btn:active{transform:scale(.98);}
+  .btn-primary{background:linear-gradient(135deg,var(--red),#b81e2b);color:#fff;box-shadow:0 6px 20px -6px var(--red);}
+  .btn-ghost{background:var(--elevated);color:var(--text);border:1px solid var(--line);}
+  .btn-primary:disabled{background:var(--elevated);color:var(--muted);box-shadow:none;cursor:not-allowed;}
+  /* rows */
+  .rowlist{display:flex;flex-direction:column;gap:1px;background:var(--line);border-radius:14px;overflow:hidden;}
+  .rowlist .row{background:var(--surface);padding:13px 14px;display:flex;align-items:center;gap:12px;}
+  .rank-badge{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-family:'Barlow Condensed';font-weight:700;font-size:15px;background:var(--elevated);color:var(--muted);flex-shrink:0;}
+  .rank-badge.g1{background:linear-gradient(135deg,#f5c542,#e0961f);color:#231a00;}
+  .rank-badge.g2{background:linear-gradient(135deg,#cfd6e0,#9aa4b3);color:#141a24;}
+  .rank-badge.g3{background:linear-gradient(135deg,#d68a5b,#a45a2e);color:#1c0f06;}
+  .avatar{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:700;font-size:14px;background:var(--elevated);flex-shrink:0;}
+  .grow{flex:1;min-width:0;}
+  .row-title{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .row-sub{font-size:12px;color:var(--muted);}
+  .row-val{font-family:'Barlow Condensed';font-weight:700;font-size:19px;}
+  /* pool bar */
+  .poolbar{height:12px;border-radius:999px;overflow:hidden;display:flex;background:var(--elevated);}
+  .poolbar .a{background:linear-gradient(90deg,#2563eb,#3b82f6);}
+  .poolbar .b{background:linear-gradient(90deg,#dc2626,#ef4444);}
+  /* nav */
+  .bottomnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:460px;background:rgba(13,18,30,.95);backdrop-filter:blur(16px);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:40;}
+  .navbtn{background:none;border:none;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;cursor:pointer;font-size:10px;font-weight:600;font-family:inherit;transition:color .15s;}
+  .navbtn.active{color:var(--text);}
+  .navbtn .ico{font-size:19px;line-height:1;}
+  .navbtn.active .ico{filter:drop-shadow(0 0 8px var(--ice));}
+  /* stake grid */
+  .stakegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .stake{background:var(--elevated);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center;font-family:'Barlow Condensed';font-weight:700;font-size:20px;cursor:pointer;color:var(--text);}
+  .stake.sel{background:var(--red-soft);border-color:var(--red);color:var(--red);}
+  .teambtn{border:2px solid var(--line);border-radius:14px;padding:14px;background:var(--surface);cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text);}
+  .teambtn.sel{border-color:var(--ice);background:var(--ice-soft);}
+  /* modal */
+  .backdrop{position:fixed;inset:0;background:rgba(4,7,14,.7);backdrop-filter:blur(4px);z-index:60;display:flex;align-items:flex-end;justify-content:center;}
+  .sheet{width:100%;max-width:460px;background:var(--surface);border-top-left-radius:24px;border-top-right-radius:24px;border-top:1px solid var(--line);padding:8px 18px calc(24px + env(safe-area-inset-bottom));animation:slideup .28s cubic-bezier(.2,.8,.2,1);}
+  @keyframes slideup{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .grabber{width:38px;height:4px;border-radius:99px;background:var(--line);margin:8px auto 14px;}
+  /* pos tabs / chips */
+  .chips{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:none;}
+  .chips::-webkit-scrollbar{display:none;}
+  .chip{white-space:nowrap;padding:8px 14px;border-radius:999px;background:var(--elevated);border:1px solid var(--line);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;}
+  .chip.active{background:var(--text);color:var(--ink);border-color:var(--text);}
+  /* player market card */
+  .pcard{display:flex;align-items:center;gap:12px;padding:13px 14px;}
+  .pnum{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-family:'Barlow Condensed';font-weight:700;font-size:17px;flex-shrink:0;color:#fff;}
+  .pop-wrap{display:flex;align-items:center;gap:8px;}
+  .pop-track{width:52px;height:6px;border-radius:99px;background:var(--elevated);overflow:hidden;}
+  .pop-fill{height:100%;background:linear-gradient(90deg,var(--ice),#7dd3fc);}
+  .price{font-family:'Barlow Condensed';font-weight:700;font-size:19px;color:var(--gold);}
+  .add-btn{width:32px;height:32px;border-radius:10px;border:1px solid var(--line);background:var(--elevated);color:var(--text);font-size:19px;cursor:pointer;flex-shrink:0;display:grid;place-items:center;font-family:'Barlow Condensed';}
+  .add-btn.owned{background:var(--green-soft);border-color:var(--green);color:var(--green);}
+  .add-btn:disabled{opacity:.35;cursor:not-allowed;}
+  /* rink */
+  .rink{background:linear-gradient(180deg,#0e1830,#0a1122);border:1px solid var(--line);border-radius:18px;padding:18px 10px;position:relative;overflow:hidden;}
+  .rink:before{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:var(--red);opacity:.35;}
+  .rink-line{display:flex;justify-content:center;gap:10px;margin:14px 0;position:relative;z-index:2;flex-wrap:wrap;}
+  .slot{width:64px;text-align:center;}
+  .slot .puckicon{width:44px;height:44px;border-radius:50%;margin:0 auto 5px;display:grid;place-items:center;font-size:20px;border:2px solid rgba(255,255,255,.14);background:var(--elevated);}
+  .slot.filled .puckicon{border-color:var(--ice);background:var(--ice-soft);}
+  .slot small{font-size:10px;color:var(--muted);display:block;line-height:1.2;}
+  .slot b{font-size:11px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* stat grid */
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .stat .n{font-family:'Barlow Condensed';font-weight:700;font-size:26px;line-height:1;}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.6px;}
+  .ach{display:flex;gap:12px;align-items:center;padding:13px 14px;}
+  .ach .ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:20px;background:var(--elevated);flex-shrink:0;}
+  .ach.locked{opacity:.4;}
+  .toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:var(--elevated);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:12px;font-size:13px;font-weight:600;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:pop .25s;}
+  @keyframes pop{from{opacity:0;transform:translate(-50%,8px);}to{opacity:1;transform:translate(-50%,0);}}
+  .banner{margin:14px 16px 0;padding:11px 14px;border-radius:12px;background:var(--ice-soft);border:1px solid rgba(56,189,248,.3);font-size:12.5px;color:#bfe3fb;display:flex;gap:9px;align-items:flex-start;}
+  .tag-outcome{font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;}
+  .win{background:var(--green-soft);color:var(--green);}
+  .lose{background:var(--red-soft);color:var(--red);}
+  .open{background:var(--ice-soft);color:var(--ice);}
+  .divider{height:1px;background:var(--line);margin:14px 0;}
+  .muted{color:var(--muted);}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef } = React;
 
-/* ------------------------------------------------------------------ */
-/*  HockeyPool Schweiz — interaktiver MVP-Prototyp (Mock-Daten)        */
-/*  Alle Berechnungen laufen hier im Frontend nur zu Demo-Zwecken.     */
-/*  In der Produktivversion gehören sie serverseitig (siehe Notiz).    */
-/* ------------------------------------------------------------------ */
-
-/* ---- Konfiguration Preisformel (deterministisch, monoton) --------- */
-const PRICE_CONFIG = { base: 300, range: 1700, exponent: 1.3, roundTo: 50 };
-function priceFromPopularity(score) {
-  const { base, range, exponent, roundTo } = PRICE_CONFIG;
-  const raw = base + Math.pow(score / 100, exponent) * range;
-  return Math.round(raw / roundTo) * roundTo;
+/* ---------- Helpers ---------- */
+const fmt = n => Math.round(n).toLocaleString('de-CH');   // 10'000
+const PRICE_CONFIG = { base:300, range:1700, exponent:1.3, roundTo:50 };
+function priceFromPopularity(score){
+  const {base,range,exponent,roundTo}=PRICE_CONFIG;
+  const raw = base + Math.pow(score/100, exponent)*range;
+  return Math.round(raw/roundTo)*roundTo;
 }
 
-/* ---- Teams -------------------------------------------------------- */
+/* ---------- Mock-Daten ---------- */
 const TEAMS = {
-  ZSC: { name: "ZSC Lions", short: "ZSC", color: "#2563eb", tag: "🦁" },
-  SCB: { name: "SC Bern", short: "SCB", color: "#dc2626", tag: "🐻" },
-  ZUG: { name: "EV Zug", short: "ZUG", color: "#0ea5e9", tag: "⚡" },
-  DAV: { name: "HC Davos", short: "HCD", color: "#eab308", tag: "🏔️" },
-  LAU: { name: "Lausanne HC", short: "LHC", color: "#1e40af", tag: "🦅" },
-  FRI: { name: "Fribourg-Gottéron", short: "FRI", color: "#0f766e", tag: "🐉" },
-  GSHC: { name: "Genève-Servette", short: "GSHC", color: "#7c1d1d", tag: "🦅" },
-  BIE: { name: "EHC Biel", short: "BIE", color: "#eab308", tag: "🐝" },
+  ZSC:{name:"ZSC Lions", short:"ZSC", color:"#2563eb", tag:"🦁"},
+  SCB:{name:"SC Bern", short:"SCB", color:"#dc2626", tag:"🐻"},
+  ZUG:{name:"EV Zug", short:"ZUG", color:"#0ea5e9", tag:"⚡"},
+  DAV:{name:"HC Davos", short:"HCD", color:"#eab308", tag:"🏔️"},
+  LAU:{name:"Lausanne HC", short:"LHC", color:"#1e40af", tag:"🦅"},
+  FRI:{name:"Fribourg-Gottéron", short:"FRI", color:"#0f766e", tag:"🐉"},
+  GSHC:{name:"Genève-Servette", short:"GSHC", color:"#7c1d1d", tag:"🦅"},
+  BIE:{name:"EHC Biel", short:"BIE", color:"#eab308", tag:"🐝"},
 };
 
-/* ---- Spieler (fiktiv, um keine realen Personendaten zu verwenden) -- */
-const rawPlayers = [
-  { id: "p1", first: "Nael", last: "Brunner", team: "ZSC", pos: "FORWARD", num: 71, pop: 92, potg: 8 },
-  { id: "p2", first: "Timo", last: "Wiget", team: "SCB", pos: "FORWARD", num: 9, pop: 88, potg: 5 },
-  { id: "p3", first: "Loïc", last: "Aebischer", team: "ZUG", pos: "DEFENDER", num: 44, pop: 84, potg: 3 },
-  { id: "p4", first: "Robin", last: "Kälin", team: "DAV", pos: "GOALIE", num: 30, pop: 81, potg: 6 },
-  { id: "p5", first: "Sven", last: "Roth", team: "LAU", pos: "FORWARD", num: 17, pop: 79, potg: 4 },
-  { id: "p6", first: "Elia", last: "Meyer", team: "FRI", pos: "DEFENDER", num: 55, pop: 74, potg: 2 },
-  { id: "p7", first: "Marc", last: "Steiner", team: "GSHC", pos: "GOALIE", num: 32, pop: 72, potg: 4 },
-  { id: "p8", first: "Dario", last: "Frei", team: "BIE", pos: "FORWARD", num: 22, pop: 71, potg: 1 },
-  { id: "p9", first: "Levin", last: "Graf", team: "ZSC", pos: "DEFENDER", num: 6, pop: 68, potg: 2 },
-  { id: "p10", first: "Yanis", last: "Baumann", team: "SCB", pos: "FORWARD", num: 88, pop: 66, potg: 3 },
-  { id: "p11", first: "Kilian", last: "Suter", team: "ZUG", pos: "FORWARD", num: 15, pop: 63, potg: 1 },
-  { id: "p12", first: "Andri", last: "Hofer", team: "DAV", pos: "DEFENDER", num: 4, pop: 61, potg: 0 },
-  { id: "p13", first: "Joel", last: "Zimmermann", team: "LAU", pos: "GOALIE", num: 29, pop: 58, potg: 2 },
-  { id: "p14", first: "Nino", last: "Weber", team: "FRI", pos: "FORWARD", num: 11, pop: 54, potg: 1 },
-  { id: "p15", first: "Silvan", last: "Keller", team: "GSHC", pos: "DEFENDER", num: 77, pop: 49, potg: 0 },
-  { id: "p16", first: "Rafael", last: "Marti", team: "BIE", pos: "FORWARD", num: 24, pop: 46, potg: 1 },
-  { id: "p17", first: "Colin", last: "Schmid", team: "ZSC", pos: "FORWARD", num: 33, pop: 41, potg: 0 },
-  { id: "p18", first: "Dominik", last: "Huber", team: "SCB", pos: "DEFENDER", num: 8, pop: 38, potg: 0 },
-  { id: "p19", first: "Fabio", last: "Lehmann", team: "ZUG", pos: "GOALIE", num: 1, pop: 35, potg: 1 },
-  { id: "p20", first: "Enea", last: "Bianchi", team: "DAV", pos: "FORWARD", num: 19, pop: 31, potg: 0 },
-  { id: "p21", first: "Luca", last: "Gerber", team: "LAU", pos: "DEFENDER", num: 5, pop: 28, potg: 0 },
-  { id: "p22", first: "Simon", last: "Moser", team: "FRI", pos: "FORWARD", num: 27, pop: 24, potg: 0 },
-];
-const PLAYERS = rawPlayers.map((p) => ({
-  ...p,
-  name: `${p.first} ${p.last}`,
-  price: priceFromPopularity(p.pop),
-  trend: [18, 14, 11, 6, 4, 2, 0, -3, -6, -9, -12][p.id.length] ?? (p.pop > 60 ? 6 : -4),
-  teamsCount: Math.max(2, Math.round(p.pop * 1.4)),
-  favCount: Math.round(p.pop / 2.2),
-}));
-// stabile, deterministische Trend-Werte
-PLAYERS.forEach((p, i) => {
-  const seq = [18, -15, 14, 9, -10, 11, 5, 7, -6, 4, 2, -4, 8, 3, -8, 6, -2, -11, 1, -5, -3, 10];
-  p.trend = seq[i % seq.length];
-});
+// Fiktive Spieler (keine realen Personendaten)
+let PID=0;
+const mkP=(fn,ln,team,pos,num,pop,fav,teams,potg)=>({id:++PID,firstName:fn,lastName:ln,team,pos,num,pop,fav,teams,potg,trend:Math.round((Math.random()*30-8))});
+const PLAYERS = [
+  mkP("Nino","Berger","ZSC","F",96,92,42,127,8),
+  mkP("Luca","Weber","SCB","F",71,88,31,98,5),
+  mkP("Elias","Moser","ZUG","F",29,84,22,86,4),
+  mkP("Timo","Frei","DAV","D",6,81,18,74,2),
+  mkP("Jan","Keller","LAU","F",17,79,15,69,3),
+  mkP("Noah","Steiner","FRI","G",30,77,26,81,6),
+  mkP("Leon","Baumann","ZSC","D",44,74,11,58,1),
+  mkP("Simon","Roth","GSHC","F",22,71,9,52,2),
+  mkP("Kevin","Meier","BIE","F",88,68,7,47,1),
+  mkP("Yves","Schmid","ZUG","G",1,66,14,61,3),
+  mkP("Marco","Graf","SCB","D",55,63,6,44,0),
+  mkP("Fabio","Lehmann","DAV","F",93,59,5,39,1),
+  mkP("Sven","Widmer","LAU","D",8,54,4,33,0),
+  mkP("Dario","Huber","FRI","F",11,52,8,41,2),
+  mkP("Robin","Wyss","ZSC","G",35,49,10,45,1),
+  mkP("Aaron","Suter","GSHC","D",21,46,3,28,0),
+  mkP("Colin","Bühler","BIE","D",4,43,2,22,0),
+  mkP("Mika","Zimmermann","ZUG","F",67,41,3,26,1),
+  mkP("Dean","Fischer","DAV","F",19,38,2,19,0),
+  mkP("Loris","Brunner","LAU","G",29,36,4,24,0),
+  mkP("Nael","Gerber","SCB","F",26,33,1,14,0),
+  mkP("Ryan","Marti","FRI","D",77,28,1,11,0),
+  mkP("Levin","Kunz","GSHC","F",14,24,1,9,0),
+  mkP("Elia","Pfister","BIE","F",90,19,0,6,0),
+].map(p=>({...p, price:priceFromPopularity(p.pop)}));
 
-const ROSTER_RULES = { GOALIE: 2, DEFENDER: 5, FORWARD: 8 };
-const POS_LABEL = { GOALIE: "Torhüter", DEFENDER: "Verteidiger", FORWARD: "Stürmer" };
+const posLabel = {G:"Torhüter", D:"Verteidiger", F:"Stürmer"};
 
-/* ---- Gruppe & Mitglieder ------------------------------------------ */
-const ME = "Luca";
-const MEMBERS = [
-  { name: "Luca", tipPts: 8450, streak: 5 },
-  { name: "Marco", tipPts: 8120, streak: 2 },
-  { name: "Sarah", tipPts: 7950, streak: 3 },
-  { name: "Jonas", tipPts: 7500, streak: 0 },
-  { name: "Nina", tipPts: 7180, streak: 1 },
-  { name: "Reto", tipPts: 6940, streak: 4 },
-];
-
-/* ---- Spiele (Zeiten relativ zu jetzt für Demo) -------------------- */
 const now = Date.now();
-const MIN = 60 * 1000;
-const initialGames = [
-  {
-    id: "g1", home: "ZSC", away: "SCB",
-    start: now + 45 * MIN, status: "OPEN",
-    homeScore: null, awayScore: null,
-    groupBets: [
-      { user: "Marco", team: "SCB", amount: 500 },
-      { user: "Sarah", team: "ZSC", amount: 100 },
-      { user: "Jonas", team: "SCB", amount: 250 },
-    ],
-  },
-  {
-    id: "g2", home: "ZUG", away: "DAV",
-    start: now + 4 * 60 * MIN, status: "OPEN",
-    homeScore: null, awayScore: null, groupBets: [],
-  },
-  {
-    id: "g3", home: "LAU", away: "FRI",
-    start: now + 30 * MIN, status: "LOCKED",
-    homeScore: null, awayScore: null,
-    groupBets: [
-      { user: "Marco", team: "LAU", amount: 200 },
-      { user: "Sarah", team: "FRI", amount: 150 },
-    ],
-  },
-  {
-    id: "g4", home: "GSHC", away: "BIE",
-    start: now - 90 * MIN, status: "LIVE",
-    homeScore: 2, awayScore: 1, groupBets: [],
-  },
-  {
-    id: "g5", home: "DAV", away: "ZUG",
-    start: now - 5 * 60 * MIN, status: "FINISHED",
-    homeScore: 1, awayScore: 4,
-    result: "ZUG",
-    myBet: { team: "ZUG", amount: 100, won: true, payout: 190 },
-    groupBets: [],
-  },
+const GAMES = [
+  {id:1, home:"ZSC", away:"SCB", start:now+55*60000, status:"OPEN",
+   pool:{ZSC:350, SCB:750}, tips:[
+     {u:"Luca",t:"ZSC",amt:250},{u:"Marco",t:"SCB",amt:500},
+     {u:"Sarah",t:"ZSC",amt:100},{u:"Jonas",t:"SCB",amt:250}], myTip:{t:"ZSC",amt:250}},
+  {id:2, home:"DAV", away:"ZUG", start:now+3*3600000, status:"OPEN", pool:{DAV:420, ZUG:180}, tips:[], myTip:null},
+  {id:3, home:"LAU", away:"FRI", start:now+26*3600000, status:"OPEN", pool:{LAU:0, FRI:0}, tips:[], myTip:null},
+  {id:4, home:"GSHC", away:"BIE", start:now+50*60000, status:"LIVE", hs:2, as:1, pool:{GSHC:600,BIE:400}, tips:[], myTip:{t:"GSHC",amt:200}},
+  {id:5, home:"ZUG", away:"SCB", start:now-2*3600000, status:"FINISHED", hs:4, as:2, pool:{ZUG:900,SCB:300}, tips:[], myTip:{t:"ZUG",amt:100}, won:true},
+  {id:6, home:"FRI", away:"DAV", start:now-26*3600000, status:"FINISHED", hs:1, as:3, pool:{FRI:500,DAV:700}, tips:[], myTip:{t:"FRI",amt:150}, won:false},
 ];
 
-/* ---- kleine Helfer ------------------------------------------------ */
-const fmt = (n) => n.toLocaleString("de-CH").replace(/,/g, "'");
-function fmtCountdown(ms) {
-  if (ms <= 0) return "00:00:00";
-  const s = Math.floor(ms / 1000);
-  const h = String(Math.floor(s / 3600)).padStart(2, "0");
-  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
-  const sec = String(s % 60).padStart(2, "0");
-  return `${h}:${m}:${sec}`;
+const MEMBERS = [
+  {name:"Luca", pts:8450, streak:5, me:true},
+  {name:"Marco", pts:8120, streak:2},
+  {name:"Sarah", pts:7950, streak:3},
+  {name:"Jonas", pts:7500, streak:0},
+  {name:"Nina", pts:7180, streak:1},
+  {name:"Timo", pts:6900, streak:0},
+  {name:"Aline", pts:6540, streak:4},
+  {name:"Ben", pts:6210, streak:0},
+];
+
+const ROSTER_RULES = { G:2, D:5, F:8 };
+const START_BUDGET = 10000;
+
+const ACHIEVEMENTS = [
+  {icon:"🔥", name:"Hot Hand", desc:"5 richtige Tipps in Serie", got:true},
+  {icon:"🎯", name:"Scharfschütze", desc:"10 richtige Tipps", got:true},
+  {icon:"❤️", name:"Fan", desc:"Lieblingsspieler gewählt", got:true},
+  {icon:"🧠", name:"Fantasy Manager", desc:"Fantasy-Team erstellt", got:false},
+  {icon:"📈", name:"Scout", desc:"Spieler vor grossem Anstieg gewählt", got:false},
+  {icon:"🏆", name:"Champion", desc:"Saison gewonnen", got:false},
+];
+
+/* ---------- kleine Bausteine ---------- */
+function Crest({code, size=56}){
+  const t=TEAMS[code];
+  return <div className="crest" style={{width:size,height:size,background:t.color+"22",boxShadow:`inset 0 0 0 1px ${t.color}55`,fontSize:size*0.5}}>{t.tag}</div>;
 }
-const TIP_LOCK_MS = 60 * MIN;
+function StatusPill({s}){
+  const map={OPEN:["open","🟢 Offen"],LOCKED:["locked","🔒 Geschlossen"],LIVE:["live","● Live"],FINISHED:["done","Beendet"],UPCOMING:["open","Bald"]};
+  const [cls,label]=map[s]||["done",s];
+  return <span className={"pill "+cls}>{label}</span>;
+}
+function useCountdown(target){
+  const [t,setT]=useState(target-Date.now());
+  useEffect(()=>{const i=setInterval(()=>setT(target-Date.now()),1000);return()=>clearInterval(i);},[target]);
+  return t;
+}
+function fmtCd(ms){
+  if(ms<=0) return "00:00:00";
+  const s=Math.floor(ms/1000), h=Math.floor(s/3600), m=Math.floor((s%3600)/60), ss=s%60;
+  const p=x=>String(x).padStart(2,"0");
+  return `${p(h)}:${p(m)}:${p(ss)}`;
+}
+// Tipp-Schluss = 60 Min vor Spielbeginn
+const lockTime = g => g.start - 60*60000;
+const isOpen = g => g.status==="OPEN" && Date.now() < lockTime(g);
 
-/* ================================================================== */
-/*  APP                                                               */
-/* ================================================================== */
-export default function App() {
-  const [tab, setTab] = useState("home");
-  const [tick, setTick] = useState(Date.now());
-  const [tipBalance, setTipBalance] = useState(7850);
-  const [games, setGames] = useState(initialGames);
-  const [myBets, setMyBets] = useState({
-    g1: { team: "ZSC", amount: 250 },
-    g5: { team: "ZUG", amount: 100 },
-  });
-  const [roster, setRoster] = useState(["p1", "p3", "p4", "p9", "p10", "p6"]);
-  const [favorite, setFavorite] = useState("p1");
-  const [tipModal, setTipModal] = useState(null); // gameId
-  const [playerModal, setPlayerModal] = useState(null); // playerId
-  const [toast, setToast] = useState(null);
+/* ============ SCREENS ============ */
 
-  useEffect(() => {
-    const t = setInterval(() => setTick(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const showToast = (msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2600);
-  };
-
-  const spent = useMemo(
-    () => roster.reduce((s, id) => s + (PLAYERS.find((p) => p.id === id)?.price || 0), 0),
-    [roster]
-  );
-  const FANTASY_BUDGET = 10000;
-
-  /* Tipp abgeben */
-  const placeBet = (gameId, team, amount) => {
-    setTipBalance((b) => b - amount);
-    setMyBets((m) => ({ ...m, [gameId]: { team, amount } }));
-    setGames((gs) =>
-      gs.map((g) =>
-        g.id === gameId
-          ? { ...g, groupBets: [...g.groupBets, { user: ME, team, amount }] }
-          : g
-      )
-    );
-    setTipModal(null);
-    showToast(`Tipp abgegeben: ${fmt(amount)} auf ${TEAMS[team].short}`);
-  };
-
-  /* Fantasy add/remove */
-  const toggleRoster = (id) => {
-    const p = PLAYERS.find((x) => x.id === id);
-    if (roster.includes(id)) {
-      setRoster((r) => r.filter((x) => x !== id));
-      return;
-    }
-    const posCount = roster.filter(
-      (r) => PLAYERS.find((x) => x.id === r)?.pos === p.pos
-    ).length;
-    if (posCount >= ROSTER_RULES[p.pos]) {
-      showToast(`${POS_LABEL[p.pos]} sind voll (${ROSTER_RULES[p.pos]})`);
-      return;
-    }
-    if (spent + p.price > FANTASY_BUDGET) {
-      showToast("Budget überschritten");
-      return;
-    }
-    setRoster((r) => [...r, id]);
-  };
-
+function Dashboard({state, go, openTip}){
+  const next = GAMES.find(g=>g.status==="OPEN"||g.status==="LIVE");
+  const cd = useCountdown(lockTime(next));
+  const open = isOpen(next);
+  const fantasyValue = state.roster.reduce((s,id)=>s+PLAYERS.find(p=>p.id===id).price,0);
   return (
-    <div className="min-h-screen w-full text-slate-100 flex justify-center antialiased" style={{ background: "#0a0f1c" }}>
-      <style>{`
-        .text-\\[10px\\]{font-size:10px;line-height:1.1}
-        .text-\\[11px\\]{font-size:11px;line-height:1.25}
-        .w-\\[90\\%\\]{width:90%}
-        .max-w-\\[60px\\]{max-width:60px}
-        .top-\\[30\\%\\]{top:30%}
-        .top-\\[70\\%\\]{top:70%}
-        input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-      `}</style>
-      <div className="w-full max-w-md relative pb-24" style={{ minHeight: "100vh" }}>
-        {/* Ice ambient top glow */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-56" style={{ background: "linear-gradient(180deg, rgba(23,37,84,0.55), rgba(10,15,28,0))" }} />
-
-        <div className="relative">
-          {tab === "home" && (
-            <Dashboard
-              tick={tick} games={games} myBets={myBets} tipBalance={tipBalance}
-              spent={spent} budget={FANTASY_BUDGET}
-              onTip={(id) => setTipModal(id)} onGoto={setTab}
-            />
-          )}
-          {tab === "games" && (
-            <GamesView tick={tick} games={games} myBets={myBets} onTip={(id) => setTipModal(id)} />
-          )}
-          {tab === "fantasy" && (
-            <FantasyView
-              roster={roster} spent={spent} budget={FANTASY_BUDGET}
-              onToggle={toggleRoster} onOpenPlayer={(id) => setPlayerModal(id)}
-            />
-          )}
-          {tab === "rank" && <RankingView roster={roster} favorite={favorite} />}
-          {tab === "profile" && (
-            <ProfileView
-              tipBalance={tipBalance} favorite={favorite}
-              onOpenPlayer={(id) => setPlayerModal(id)} myBets={myBets} games={games}
-            />
-          )}
-        </div>
-
-        {/* Tipp-Modal */}
-        {tipModal && (
-          <TipModal
-            game={games.find((g) => g.id === tipModal)}
-            balance={tipBalance} tick={tick}
-            existing={myBets[tipModal]}
-            onClose={() => setTipModal(null)}
-            onConfirm={placeBet}
-          />
-        )}
-
-        {/* Spieler-Modal */}
-        {playerModal && (
-          <PlayerModal
-            player={PLAYERS.find((p) => p.id === playerModal)}
-            isFav={favorite === playerModal}
-            inRoster={roster.includes(playerModal)}
-            onFav={() => { setFavorite(playerModal); showToast("Lieblingsspieler gesetzt"); }}
-            onToggle={() => toggleRoster(playerModal)}
-            onClose={() => setPlayerModal(null)}
-          />
-        )}
-
-        {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-md w-[90%]">
-            <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-center shadow-2xl shadow-black/60">
-              {toast}
-            </div>
-          </div>
-        )}
-
-        <BottomNav tab={tab} setTab={setTab} />
+    <div>
+      <div className="section" style={{paddingTop:18}}>
+        <div className="eyebrow">Hockeyrunde 2026/27</div>
+        <h1 style={{fontSize:26,fontWeight:700,letterSpacing:-.5,marginTop:4}}>Hallo Luca 👋</h1>
       </div>
-    </div>
-  );
-}
-
-/* ================================================================== */
-/*  Bottom-Navigation                                                  */
-/* ================================================================== */
-function BottomNav({ tab, setTab }) {
-  const items = [
-    { id: "home", label: "Übersicht", Icon: Home },
-    { id: "games", label: "Spiele", Icon: Swords },
-    { id: "fantasy", label: "Fantasy", Icon: Brain },
-    { id: "rank", label: "Rangliste", Icon: Trophy },
-    { id: "profile", label: "Profil", Icon: User },
-  ];
-  return (
-    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40">
-      <div className="mx-3 mb-3 rounded-2xl bg-slate-900/90 backdrop-blur border border-slate-800 shadow-2xl shadow-black/60 grid grid-cols-5">
-        {items.map(({ id, label, Icon }) => {
-          const active = tab === id;
-          return (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className="flex flex-col items-center gap-1 py-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded-2xl"
-            >
-              <Icon size={20} className={active ? "text-red-500" : "text-slate-500"} />
-              <span className={`text-[10px] font-medium ${active ? "text-white" : "text-slate-500"}`}>
-                {label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
-/* ================================================================== */
-/*  Dashboard / Übersicht                                              */
-/* ================================================================== */
-function Dashboard({ tick, games, myBets, tipBalance, spent, budget, onTip, onGoto }) {
-  const next = games.find((g) => g.status === "OPEN") || games[0];
-  const lockAt = next.start - TIP_LOCK_MS;
-  const remaining = lockAt - tick;
-  const myBet = myBets[next.id];
-  const ranking = [...MEMBERS].sort((a, b) => b.tipPts - a.tipPts);
-
-  return (
-    <div className="px-4 pt-6 space-y-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-400 text-sm">Willkommen zurück</p>
-          <h1 className="text-2xl font-bold tracking-tight">Hallo Luca 👋</h1>
-        </div>
-        <div className="h-11 w-11 rounded-full bg-gradient-to-br from-red-500 to-red-700 grid place-items-center font-bold text-lg">
-          L
-        </div>
-      </header>
 
       {/* Punktestand */}
-      <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-5">
-        <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-widest">
-          <Wallet size={14} /> Dein Tipp-Guthaben
+      <div className="section" style={{paddingTop:6}}>
+        <div className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center",background:"radial-gradient(120% 140% at 100% 0%,#1d2a44,#131b2c)"}}>
+          <div>
+            <div className="eyebrow">Dein Tipp-Guthaben</div>
+            <div className="mono" style={{fontSize:38,fontWeight:700,marginTop:2}}>{fmt(state.balance)}</div>
+          </div>
+          <div style={{textAlign:"right"}}>
+            <div className="eyebrow">Fantasy-Wert</div>
+            <div className="mono" style={{fontSize:24,fontWeight:700,color:"var(--gold)"}}>{fmt(fantasyValue)}</div>
+            <div className="row-sub">/ {fmt(START_BUDGET)}</div>
+          </div>
         </div>
-        <p className="text-4xl font-extrabold mt-1 tabular-nums">{fmt(tipBalance)}</p>
-        <p className="text-slate-500 text-sm">Punkte</p>
       </div>
 
       {/* Nächstes Spiel */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
-        <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
-          <span className="text-xs uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-            <Circle size={8} className="fill-red-500 text-red-500" /> Nächstes Spiel
-          </span>
-          <StatusBadge status={next.status} />
-        </div>
-        <Matchup home={next.home} away={next.away} big />
-        <div className="px-4 pb-4">
-          <div className="flex items-center justify-center gap-2 text-sm text-slate-300 mb-3">
-            <Clock size={14} className="text-red-500" />
-            {remaining > 0 ? (
-              <>Tipps schliessen in <span className="font-bold tabular-nums text-white">{fmtCountdown(remaining)}</span></>
-            ) : (
-              <span className="text-slate-500">Tipps geschlossen 🔒</span>
-            )}
+      <div className="hero">
+        <div className="hero-inner">
+          <div className="hero-top">
+            <span className="eyebrow">{next.status==="LIVE"?"Läuft gerade":"Nächstes Spiel · Heute"}</span>
+            <StatusPill s={next.status}/>
           </div>
-          {myBet ? (
-            <div className="rounded-xl bg-slate-800/70 border border-slate-700 p-3 flex items-center justify-between">
-              <span className="text-sm text-slate-400">Dein Tipp</span>
-              <span className="font-semibold">
-                {TEAMS[myBet.team].tag} {TEAMS[myBet.team].short} · {fmt(myBet.amount)}
-              </span>
+          <div className="matchup">
+            <div className="team-col">
+              <Crest code={next.home}/>
+              <div><div className="team-name">{TEAMS[next.home].name}</div><div className="team-sub">Heim</div></div>
             </div>
-          ) : remaining > 0 ? (
-            <button
-              onClick={() => onTip(next.id)}
-              className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.99] transition rounded-xl py-3 font-bold tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-            >
-              JETZT TIPPEN
-            </button>
-          ) : null}
-        </div>
-      </div>
+            {next.status==="LIVE"
+              ? <div style={{textAlign:"center"}}><div className="score">{next.hs}:{next.as}</div><div className="team-sub">2. Drittel</div></div>
+              : <div className="vs">VS</div>}
+            <div className="team-col">
+              <Crest code={next.away}/>
+              <div><div className="team-name">{TEAMS[next.away].name}</div><div className="team-sub">Auswärts</div></div>
+            </div>
+          </div>
 
-      {/* Gruppe + Rangliste */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-          <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-widest">
-            <Users size={13} /> Gruppe
-          </div>
-          <p className="font-semibold mt-2 leading-tight">Hockeyrunde 2026/27</p>
-          <p className="text-slate-500 text-sm">{MEMBERS.length} Mitglieder</p>
-        </div>
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-          <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-widest">
-            <Brain size={13} /> Fantasy-Team
-          </div>
-          <p className="font-semibold mt-2 tabular-nums">{fmt(spent)} <span className="text-slate-500 font-normal">/ {fmt(budget)}</span></p>
-          <div className="h-1.5 rounded-full bg-slate-800 mt-2 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-blue-500 to-red-500" style={{ width: `${(spent / budget) * 100}%` }} />
+          {next.status==="OPEN" && <div className="countdown">
+            <div className="eyebrow">Tipps schliessen in</div>
+            <div className={"cd-time "+(cd<15*60000?"hot":"")}>{fmtCd(cd)}</div>
+          </div>}
+
+          <div style={{marginTop:16}}>
+            {next.myTip
+              ? <div className="card" style={{background:"var(--elevated)",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 14px"}}>
+                  <div><div className="eyebrow">Dein Tipp</div><div style={{fontWeight:700,marginTop:2}}>{TEAMS[next.myTip.t].tag} {TEAMS[next.myTip.t].name}</div></div>
+                  <div className="mono" style={{fontSize:22,fontWeight:700}}>{fmt(next.myTip.amt)}</div>
+                </div>
+              : open
+                ? <button className="btn btn-primary" onClick={()=>openTip(next)}>Jetzt tippen</button>
+                : <button className="btn btn-primary" disabled>Tipps geschlossen</button>}
           </div>
         </div>
       </div>
 
-      {/* Rangliste */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-            <Trophy size={14} className="text-yellow-500" /> Rangliste
-          </span>
-          <button onClick={() => onGoto("rank")} className="text-xs text-red-400 flex items-center gap-0.5">
-            Alle <ChevronRight size={12} />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {ranking.slice(0, 4).map((m, i) => (
-            <div key={m.name} className="flex items-center gap-3">
-              <span className={`w-6 text-center font-bold ${i === 0 ? "text-yellow-500" : "text-slate-500"}`}>{i + 1}</span>
-              <span className={`flex-1 ${m.name === ME ? "text-white font-semibold" : "text-slate-300"}`}>
-                {m.name} {m.name === ME && "· du"}
-              </span>
-              <span className="tabular-nums text-slate-300 font-medium">{fmt(m.tipPts)}</span>
+      {/* Rangliste mini */}
+      <div className="section">
+        <div className="section-head"><h2>🏆 Rangliste</h2><button className="link" onClick={()=>go("rank")}>Alle ansehen</button></div>
+        <div className="rowlist">
+          {MEMBERS.slice(0,4).map((m,i)=>(
+            <div className="row" key={m.name}>
+              <div className={"rank-badge "+(i<3?"g"+(i+1):"")}>{i+1}</div>
+              <div className="avatar" style={{background:m.me?"var(--red-soft)":"var(--elevated)",color:m.me?"var(--red)":"var(--text)"}}>{m.name[0]}</div>
+              <div className="grow"><div className="row-title">{m.name}{m.me&&" (Du)"}</div></div>
+              <div className="row-val">{fmt(m.pts)}</div>
             </div>
           ))}
         </div>
       </div>
-    </div>
-  );
-}
 
-/* ================================================================== */
-/*  Spiele                                                             */
-/* ================================================================== */
-function GamesView({ tick, games, myBets, onTip }) {
-  return (
-    <div className="px-4 pt-6 space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Spiele</h1>
-      <p className="text-slate-400 text-sm -mt-2">National League · Runde 12</p>
-      <div className="space-y-3">
-        {games.map((g) => (
-          <GameCard key={g.id} game={g} tick={tick} myBet={myBets[g.id]} onTip={onTip} />
-        ))}
+      {/* Gruppe */}
+      <div className="section" style={{paddingBottom:20}}>
+        <div className="card" style={{display:"flex",alignItems:"center",gap:12}}>
+          <div className="crest" style={{width:44,height:44,fontSize:22,background:"var(--elevated)"}}>🏒</div>
+          <div className="grow"><div style={{fontWeight:700}}>Hockeyrunde 2026/27</div><div className="row-sub">8 Mitglieder · Einladungscode HOCKEY-82KF</div></div>
+          <button className="link" onClick={()=>go("rank")}>›</button>
+        </div>
       </div>
     </div>
   );
 }
 
-function GameCard({ game, tick, myBet, onTip }) {
-  const lockAt = game.start - TIP_LOCK_MS;
-  const remaining = lockAt - tick;
-  const open = game.status === "OPEN" && remaining > 0;
-
-  const pool = game.groupBets.reduce((s, b) => s + b.amount, 0);
-  const homePool = game.groupBets.filter((b) => b.team === game.home).reduce((s, b) => s + b.amount, 0);
-  const awayPool = pool - homePool;
-
-  return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
-      <div className="px-4 py-2 flex items-center justify-between border-b border-slate-800">
-        <span className="text-[11px] text-slate-400">
-          {new Date(game.start).toLocaleString("de-CH", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
-        </span>
-        <StatusBadge status={open ? "OPEN" : game.status} />
-      </div>
-
-      <Matchup home={game.home} away={game.away} homeScore={game.homeScore} awayScore={game.awayScore} />
-
-      {/* Pool */}
-      {pool > 0 && (
-        <div className="px-4 pb-3">
-          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-            <span>{TEAMS[game.home].short} {Math.round((homePool / pool) * 100)}%</span>
-            <span>Pool {fmt(pool)}</span>
-            <span>{Math.round((awayPool / pool) * 100)}% {TEAMS[game.away].short}</span>
-          </div>
-          <div className="h-2 rounded-full overflow-hidden flex bg-slate-800">
-            <div style={{ width: `${(homePool / pool) * 100}%`, background: TEAMS[game.home].color }} />
-            <div style={{ width: `${(awayPool / pool) * 100}%`, background: TEAMS[game.away].color }} />
-          </div>
-        </div>
-      )}
-
-      {/* Aktion */}
-      <div className="px-4 pb-4">
-        {game.status === "FINISHED" ? (
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-3 text-sm flex items-center justify-between">
-            <span className="text-slate-400">Endstand · Sieger {TEAMS[game.result].short}</span>
-            {myBet && (
-              <span className={myBet.won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
-                {myBet.won ? `+${fmt(myBet.payout)}` : `−${fmt(myBet.amount)}`}
-              </span>
-            )}
-          </div>
-        ) : myBet ? (
-          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-3 text-sm flex items-center justify-between">
-            <span className="text-slate-400">Dein Tipp</span>
-            <span className="font-semibold">{TEAMS[myBet.team].tag} {TEAMS[myBet.team].short} · {fmt(myBet.amount)}</span>
-          </div>
-        ) : open ? (
-          <button
-            onClick={() => onTip(game.id)}
-            className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.99] transition rounded-xl py-2.5 font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
-          >
-            Tippen · schliesst in {fmtCountdown(remaining)}
-          </button>
-        ) : (
-          <div className="rounded-xl bg-slate-800/40 border border-slate-800 p-2.5 text-center text-sm text-slate-500 flex items-center justify-center gap-1.5">
-            <Lock size={14} /> Tipps geschlossen
-          </div>
-        )}
-      </div>
-
-      {/* Gruppen-Tipps */}
-      {game.groupBets.length > 0 && (
-        <div className="px-4 pb-4">
-          <p className="text-[11px] uppercase tracking-widest text-slate-500 mb-2">Tipps der Gruppe</p>
-          <div className="space-y-1.5">
-            {game.groupBets.map((b, i) => (
-              <div key={i} className="flex items-center justify-between text-sm">
-                <span className={b.user === ME ? "text-white font-medium" : "text-slate-300"}>{b.user}</span>
-                <span className="flex items-center gap-2 text-slate-300">
-                  <span>{TEAMS[b.team].tag} {TEAMS[b.team].short}</span>
-                  <span className="tabular-nums text-slate-400">{fmt(b.amount)}</span>
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* Matchup-Anzeige (Scoreboard-Stil) */
-function Matchup({ home, away, homeScore, awayScore, big }) {
-  const H = TEAMS[home], A = TEAMS[away];
-  const hasScore = homeScore != null;
-  return (
-    <div className={`flex items-center justify-between px-5 ${big ? "py-5" : "py-4"}`}>
-      <TeamBadge team={H} size={big ? "lg" : "md"} />
-      <div className="text-center px-2">
-        {hasScore ? (
-          <div className="text-2xl font-extrabold tabular-nums">{homeScore} : {awayScore}</div>
-        ) : (
-          <div className="text-slate-500 font-bold text-lg">VS</div>
-        )}
-      </div>
-      <TeamBadge team={A} size={big ? "lg" : "md"} align="right" />
-    </div>
-  );
-}
-function TeamBadge({ team, size = "md", align = "left" }) {
-  const dim = size === "lg" ? "h-12 w-12 text-2xl" : "h-10 w-10 text-xl";
-  return (
-    <div className={`flex items-center gap-2.5 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
-      <div className={`${dim} rounded-xl grid place-items-center`} style={{ background: team.color + "22", border: `1px solid ${team.color}55` }}>
-        <span>{team.tag}</span>
-      </div>
-      <div className={align === "right" ? "text-right" : ""}>
-        <p className="font-bold leading-tight text-sm">{team.short}</p>
-        <p className="text-[11px] text-slate-500 leading-tight">{team.name}</p>
-      </div>
-    </div>
-  );
-}
-
-function StatusBadge({ status }) {
-  const map = {
-    OPEN: { t: "Offen", c: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
-    LOCKED: { t: "Geschlossen", c: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
-    LIVE: { t: "Live", c: "bg-red-500/15 text-red-400 border-red-500/30" },
-    FINISHED: { t: "Beendet", c: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
-    UPCOMING: { t: "Bald", c: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
-  };
-  const s = map[status] || map.UPCOMING;
-  return (
-    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${s.c} flex items-center gap-1`}>
-      {status === "LIVE" && <Circle size={7} className="fill-red-500 text-red-500 animate-pulse" />}
-      {s.t}
-    </span>
-  );
-}
-
-/* ================================================================== */
-/*  Tipp-Modal                                                         */
-/* ================================================================== */
-function TipModal({ game, balance, tick, existing, onClose, onConfirm }) {
-  const [team, setTeam] = useState(null);
-  const [amount, setAmount] = useState(0);
-  const [custom, setCustom] = useState("");
-  const [confirming, setConfirming] = useState(false);
-
-  const lockAt = game.start - TIP_LOCK_MS;
-  const remaining = lockAt - tick;
-  const locked = remaining <= 0;
-
-  const quick = [10, 25, 50, 100, 250, 500];
-  const valid = team && amount > 0 && amount <= balance && !locked;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 pb-8" style={{ animation: "slideup .2s ease" }}>
-        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
-
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold text-lg">Wer gewinnt?</h2>
-          <button onClick={onClose} className="text-slate-500 p-1"><X size={20} /></button>
-        </div>
-
-        {locked && (
-          <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300 flex items-center gap-2">
-            <Lock size={16} /> Tippfrist abgelaufen (60-Min-Regel).
-          </div>
-        )}
-
-        {/* Teamwahl */}
-        <div className="grid grid-cols-2 gap-3 mb-5">
-          {[game.home, game.away].map((t) => {
-            const T = TEAMS[t];
-            const sel = team === t;
-            return (
-              <button
-                key={t}
-                disabled={locked}
-                onClick={() => setTeam(t)}
-                className={`rounded-2xl p-4 border-2 transition text-center disabled:opacity-40 ${
-                  sel ? "border-red-500 bg-red-500/10" : "border-slate-700 bg-slate-800/40"
-                }`}
-              >
-                <div className="text-2xl mb-1">{T.tag}</div>
-                <div className="font-bold text-sm">{T.short}</div>
-                <div className="text-[11px] text-slate-500">{T.name}</div>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Einsatz */}
-        <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">Einsatz</p>
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {quick.map((q) => (
-            <button
-              key={q}
-              disabled={locked || q > balance}
-              onClick={() => { setAmount(q); setCustom(""); }}
-              className={`rounded-xl py-2.5 font-semibold text-sm border transition disabled:opacity-30 ${
-                amount === q && !custom ? "border-red-500 bg-red-500/10 text-white" : "border-slate-700 bg-slate-800/40 text-slate-300"
-              }`}
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-        <input
-          type="number" inputMode="numeric" placeholder="Eigener Betrag"
-          value={custom} disabled={locked}
-          onChange={(e) => {
-            setCustom(e.target.value);
-            setAmount(Math.max(0, parseInt(e.target.value || "0", 10)));
-          }}
-          className="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-3 mb-4 text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
-        />
-
-        {/* Guthaben-Rechnung */}
-        <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-3 mb-5 text-sm space-y-1">
-          <Row l="Aktuelles Guthaben" v={fmt(balance)} />
-          <Row l="Einsatz" v={amount ? fmt(amount) : "0"} accent />
-          <div className="border-t border-slate-700 my-1" />
-          <Row l="Verbleibend" v={fmt(Math.max(0, balance - amount))} bold />
-        </div>
-
-        {/* Bestätigen */}
-        {!confirming ? (
-          <button
-            disabled={!valid}
-            onClick={() => setConfirming(true)}
-            className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-xl py-3.5 font-bold tracking-wide transition"
-          >
-            TIPP ABGEBEN
-          </button>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-center text-sm text-slate-300">
-              Du setzt <b className="text-white">{fmt(amount)}</b> Punkte auf <b className="text-white">{TEAMS[team].name}</b>.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => setConfirming(false)} className="rounded-xl py-3 border border-slate-700 font-semibold text-slate-300">
-                Abbrechen
-              </button>
-              <button onClick={() => onConfirm(game.id, team, amount)} className="rounded-xl py-3 bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center justify-center gap-2">
-                <Check size={18} /> Bestätigen
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-      <style>{`@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
-    </div>
-  );
-}
-function Row({ l, v, accent, bold }) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-slate-400">{l}</span>
-      <span className={`tabular-nums ${accent ? "text-red-400" : ""} ${bold ? "font-bold text-white" : "text-slate-200"}`}>{v}</span>
-    </div>
-  );
-}
-
-/* ================================================================== */
-/*  Fantasy                                                            */
-/* ================================================================== */
-function FantasyView({ roster, spent, budget, onToggle, onOpenPlayer }) {
-  const [sub, setSub] = useState("team"); // team | market
-  const remaining = budget - spent;
-  const rosterPlayers = roster.map((id) => PLAYERS.find((p) => p.id === id));
-  const byPos = (pos) => rosterPlayers.filter((p) => p.pos === pos);
-
-  return (
-    <div className="px-4 pt-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Mein Fantasy-Team 🧠</h1>
-      </div>
-
-      {/* Budget-Leiste */}
-      <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-4">
-        <div className="grid grid-cols-3 text-center">
-          <Stat l="Budget" v={fmt(budget)} />
-          <Stat l="Ausgegeben" v={fmt(spent)} />
-          <Stat l="Übrig" v={fmt(remaining)} accent={remaining < 0} good={remaining >= 0} />
-        </div>
-        <div className="h-2 rounded-full bg-slate-800 mt-3 overflow-hidden">
-          <div className={`h-full ${remaining < 0 ? "bg-red-500" : "bg-gradient-to-r from-blue-500 to-emerald-500"}`} style={{ width: `${Math.min(100, (spent / budget) * 100)}%` }} />
-        </div>
-      </div>
-
-      {/* Umschalter */}
-      <div className="grid grid-cols-2 gap-2 bg-slate-900 border border-slate-800 rounded-xl p-1">
-        {[["team", "Aufstellung"], ["market", "Transfermarkt"]].map(([id, label]) => (
-          <button key={id} onClick={() => setSub(id)}
-            className={`py-2 rounded-lg text-sm font-semibold transition ${sub === id ? "bg-red-600 text-white" : "text-slate-400"}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {sub === "team" ? (
-        <>
-          {/* Eisfeld */}
-          <IceRink byPos={byPos} onOpenPlayer={onOpenPlayer} />
-          {/* Kaderregeln */}
-          <div className="space-y-3">
-            {["GOALIE", "DEFENDER", "FORWARD"].map((pos) => (
-              <RosterSlot key={pos} pos={pos} players={byPos(pos)} onOpenPlayer={onOpenPlayer} onToggle={onToggle} />
-            ))}
-          </div>
-        </>
-      ) : (
-        <Market roster={roster} onOpenPlayer={onOpenPlayer} onToggle={onToggle} />
-      )}
-    </div>
-  );
-}
-
-function Stat({ l, v, accent, good }) {
+function Games({state, openTip}){
+  const [filter,setFilter]=useState("all");
+  const list = GAMES.filter(g=>{
+    if(filter==="open") return g.status==="OPEN"||g.status==="LIVE";
+    if(filter==="done") return g.status==="FINISHED";
+    return true;
+  });
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-widest text-slate-500">{l}</p>
-      <p className={`text-lg font-bold tabular-nums ${accent ? "text-red-400" : good ? "text-emerald-400" : "text-white"}`}>{v}</p>
+      <div className="section" style={{paddingTop:18}}><h1 style={{fontSize:24,fontWeight:700}}>Spiele</h1></div>
+      <div className="section" style={{paddingTop:4,paddingBottom:8}}>
+        <div className="chips">
+          {[["all","Alle"],["open","Offen & Live"],["done","Beendet"]].map(([k,l])=>(
+            <button key={k} className={"chip "+(filter===k?"active":"")} onClick={()=>setFilter(k)}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div className="section" style={{display:"flex",flexDirection:"column",gap:12,paddingBottom:20}}>
+        {list.map(g=><GameCard key={g.id} g={g} openTip={openTip}/>)}
+      </div>
     </div>
   );
 }
 
-/* Eisfeld-Aufstellung (Signatur-Element) */
-function IceRink({ byPos, onOpenPlayer }) {
-  const dot = (p) => (
-    <button key={p.id} onClick={() => onOpenPlayer(p.id)}
-      className="flex flex-col items-center gap-1 focus:outline-none">
-      <div className="h-11 w-11 rounded-full grid place-items-center text-xs font-bold shadow-lg"
-        style={{ background: TEAMS[p.team].color, border: "2px solid rgba(255,255,255,.25)" }}>
-        {p.num}
+function GameCard({g, openTip}){
+  const total=(g.pool[g.home]||0)+(g.pool[g.away]||0);
+  const pa = total? (g.pool[g.home]/total*100):50;
+  const open=isOpen(g);
+  const cd=useCountdown(lockTime(g));
+  return (
+    <div className="card">
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+        <span className="eyebrow">National League</span>
+        <StatusPill s={open?"OPEN":(g.status==="OPEN"?"LOCKED":g.status)}/>
       </div>
-      <span className="text-[10px] text-slate-200 leading-tight max-w-[60px] truncate">{p.last}</span>
-    </button>
-  );
-  const empty = (k) => (
-    <div key={k} className="flex flex-col items-center gap-1 opacity-40">
-      <div className="h-11 w-11 rounded-full border-2 border-dashed border-slate-600 grid place-items-center">
-        <Plus size={16} className="text-slate-600" />
+      <div className="matchup" style={{marginBottom:12}}>
+        <div className="team-col"><Crest code={g.home} size={46}/><div className="team-name">{TEAMS[g.home].short}</div></div>
+        {g.status==="FINISHED"||g.status==="LIVE"
+          ? <div style={{textAlign:"center"}}><div className="score" style={{fontSize:30}}>{g.hs}:{g.as}</div>{g.status==="LIVE"&&<div className="team-sub" style={{color:"var(--red)"}}>Live</div>}</div>
+          : <div style={{textAlign:"center"}}><div className="vs">VS</div><div className="team-sub" style={{marginTop:4}}>{new Date(g.start).toLocaleTimeString('de-CH',{hour:'2-digit',minute:'2-digit'})}</div></div>}
+        <div className="team-col"><Crest code={g.away} size={46}/><div className="team-name">{TEAMS[g.away].short}</div></div>
       </div>
-      <span className="text-[10px] text-slate-600">frei</span>
+
+      {total>0 && <>
+        <div className="poolbar"><div className="a" style={{width:pa+"%"}}></div><div className="b" style={{width:(100-pa)+"%"}}></div></div>
+        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginTop:6,color:"var(--muted)"}}>
+          <span>{TEAMS[g.home].short} {pa.toFixed(1)}%</span>
+          <span>Pool {fmt(total)}</span>
+          <span>{(100-pa).toFixed(1)}% {TEAMS[g.away].short}</span>
+        </div>
+      </>}
+
+      {/* Gruppen-Tipps */}
+      {g.tips.length>0 && <>
+        <div className="divider"></div>
+        <div className="eyebrow" style={{marginBottom:8}}>Tipps der Gruppe</div>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {g.tips.map((t,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:10,fontSize:13}}>
+              <div className="avatar" style={{width:26,height:26,fontSize:12}}>{t.u[0]}</div>
+              <span className="grow" style={{fontWeight:600}}>{t.u}</span>
+              <span className="muted">{TEAMS[t.t].tag} {TEAMS[t.t].short}</span>
+              <span className="mono" style={{fontWeight:700,minWidth:44,textAlign:"right"}}>{fmt(t.amt)}</span>
+            </div>
+          ))}
+        </div>
+      </>}
+
+      <div style={{marginTop:14}}>
+        {g.status==="FINISHED"
+          ? <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <span className="muted" style={{fontSize:13}}>Dein Tipp: {g.myTip?`${TEAMS[g.myTip.t].tag} ${fmt(g.myTip.amt)}`:"—"}</span>
+              {g.myTip && <span className={"tag-outcome "+(g.won?"win":"lose")}>{g.won?`✅ +${fmt(g.myTip.amt)}`:`❌ -${fmt(g.myTip.amt)}`}</span>}
+            </div>
+          : g.myTip
+            ? <div className="card" style={{background:"var(--elevated)",display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px"}}>
+                <span style={{fontWeight:600,fontSize:13}}>✔ Getippt: {TEAMS[g.myTip.t].short}</span>
+                <span className="mono" style={{fontWeight:700}}>{fmt(g.myTip.amt)}</span>
+              </div>
+            : open
+              ? <button className="btn btn-primary" onClick={()=>openTip(g)}>Jetzt tippen</button>
+              : <button className="btn btn-primary" disabled>🔒 Tipp-Schluss erreicht</button>}
+      </div>
     </div>
   );
-  const line = (pos, n) => {
-    const ps = byPos(pos);
-    return Array.from({ length: n }).map((_, i) => (ps[i] ? dot(ps[i]) : empty(`${pos}${i}`)));
+}
+
+/* Tipp-Sheet */
+function TipSheet({g, balance, onClose, onConfirm}){
+  const [team,setTeam]=useState(null);
+  const [amt,setAmt]=useState(null);
+  const [custom,setCustom]=useState("");
+  const [step,setStep]=useState(1);
+  const stake = custom!==""? parseInt(custom||0,10) : amt;
+  const valid = team && stake>0 && stake<=balance;
+  return (
+    <div className="backdrop" onClick={onClose}>
+      <div className="sheet" onClick={e=>e.stopPropagation()}>
+        <div className="grabber"></div>
+        {step===1 ? <>
+          <div style={{textAlign:"center",marginBottom:16}}>
+            <div className="eyebrow">Wer gewinnt?</div>
+            <div style={{fontWeight:700,fontSize:17,marginTop:4}}>{TEAMS[g.home].name} vs. {TEAMS[g.away].name}</div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:18}}>
+            {[g.home,g.away].map(code=>(
+              <button key={code} className={"teambtn "+(team===code?"sel":"")} onClick={()=>setTeam(code)}>
+                <Crest code={code} size={44}/>
+                <div style={{fontWeight:600,fontSize:13,textAlign:"center"}}>{TEAMS[code].name}</div>
+              </button>
+            ))}
+          </div>
+          <div className="eyebrow" style={{marginBottom:8}}>Einsatz</div>
+          <div className="stakegrid" style={{marginBottom:10}}>
+            {[10,25,50,100,250,500].map(v=>(
+              <button key={v} className={"stake "+(amt===v&&custom===""?"sel":"")} onClick={()=>{setAmt(v);setCustom("");}}>{v}</button>
+            ))}
+          </div>
+          <input inputMode="numeric" placeholder="Eigener Betrag" value={custom}
+            onChange={e=>{setCustom(e.target.value.replace(/\D/g,""));setAmt(null);}}
+            style={{width:"100%",padding:"13px 14px",borderRadius:12,background:"var(--elevated)",border:"1px solid var(--line)",color:"var(--text)",fontSize:15,fontFamily:"inherit",marginBottom:14}}/>
+          <div className="card" style={{background:"var(--elevated)",marginBottom:14}}>
+            <Line l="Aktuelles Guthaben" v={fmt(balance)}/>
+            <Line l="Einsatz" v={stake?fmt(stake):"–"}/>
+            <div className="divider" style={{margin:"10px 0"}}></div>
+            <Line l="Verbleibend" v={stake?fmt(balance-stake):fmt(balance)} strong/>
+          </div>
+          {stake>balance && <div style={{color:"var(--red)",fontSize:12.5,marginBottom:10}}>Nicht genug Guthaben.</div>}
+          <button className="btn btn-primary" disabled={!valid} onClick={()=>setStep(2)}>Weiter</button>
+        </> : <>
+          <div style={{textAlign:"center",padding:"10px 0 20px"}}>
+            <div style={{fontSize:40,marginBottom:8}}>{TEAMS[team].tag}</div>
+            <div style={{fontSize:18,fontWeight:700}}>Du setzt {fmt(stake)} Punkte</div>
+            <div className="muted" style={{marginTop:4}}>auf {TEAMS[team].name}</div>
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button className="btn btn-ghost" style={{flex:1}} onClick={()=>setStep(1)}>Abbrechen</button>
+            <button className="btn btn-primary" style={{flex:1}} onClick={()=>onConfirm(g,team,stake)}>Bestätigen</button>
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
+const Line=({l,v,strong})=>(
+  <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0"}}>
+    <span className="muted" style={{fontSize:13}}>{l}</span>
+    <span className="mono" style={{fontWeight:700,fontSize:strong?18:15,color:strong?"var(--gold)":"var(--text)"}}>{v}</span>
+  </div>
+);
+
+/* Fantasy */
+function Fantasy({state, dispatch, toast, openPlayer}){
+  const [tab,setTab]=useState("team");
+  const spent = state.roster.reduce((s,id)=>s+PLAYERS.find(p=>p.id===id).price,0);
+  const left = START_BUDGET - spent;
+  const counts = {G:0,D:0,F:0};
+  state.roster.forEach(id=>counts[PLAYERS.find(p=>p.id===id).pos]++);
+
+  return (
+    <div>
+      <div className="section" style={{paddingTop:18}}><h1 style={{fontSize:24,fontWeight:700}}>Fantasy</h1></div>
+
+      {/* Budget */}
+      <div className="section" style={{paddingTop:4}}>
+        <div className="card" style={{display:"flex",justifyContent:"space-between"}}>
+          <div><div className="eyebrow">Budget</div><div className="mono" style={{fontSize:22,fontWeight:700}}>{fmt(START_BUDGET)}</div></div>
+          <div style={{textAlign:"center"}}><div className="eyebrow">Ausgegeben</div><div className="mono" style={{fontSize:22,fontWeight:700}}>{fmt(spent)}</div></div>
+          <div style={{textAlign:"right"}}><div className="eyebrow">Übrig</div><div className="mono" style={{fontSize:22,fontWeight:700,color:left<0?"var(--red)":"var(--green)"}}>{fmt(left)}</div></div>
+        </div>
+      </div>
+
+      <div className="section" style={{paddingTop:8,paddingBottom:8}}>
+        <div className="chips">
+          {[["team","🧠 Mein Team"],["market","🔄 Markt"],["transfers","📈 Transfermarkt"]].map(([k,l])=>(
+            <button key={k} className={"chip "+(tab===k?"active":"")} onClick={()=>setTab(k)}>{l}</button>
+          ))}
+        </div>
+      </div>
+
+      {tab==="team" && <TeamView state={state} counts={counts} dispatch={dispatch} toast={toast} openPlayer={openPlayer}/>}
+      {tab==="market" && <Market state={state} counts={counts} left={left} dispatch={dispatch} toast={toast} openPlayer={openPlayer}/>}
+      {tab==="transfers" && <Transfers openPlayer={openPlayer}/>}
+    </div>
+  );
+}
+
+function TeamView({state, counts, dispatch, toast, openPlayer}){
+  const get = pos => state.roster.map(id=>PLAYERS.find(p=>p.id===id)).filter(p=>p.pos===pos);
+  const Slot = ({p, pos})=>(
+    <div className={"slot "+(p?"filled":"")} onClick={()=>p&&openPlayer(p.id)}>
+      <div className="puckicon">{p? "🏒" : (pos==="G"?"🥅":"＋")}</div>
+      {p? <><b>{p.lastName}</b><small>{TEAMS[p.team].short} · {fmt(p.price)}</small></>
+        : <small>{posLabel[pos]}</small>}
+    </div>
+  );
+  const line = (pos)=> {
+    const filled=get(pos); const total=ROSTER_RULES[pos];
+    const arr=[...filled, ...Array(Math.max(0,total-filled.length)).fill(null)];
+    return arr.map((p,i)=><Slot key={i} p={p} pos={pos}/>);
   };
   return (
-    <div className="rounded-2xl overflow-hidden border border-blue-900/40 relative"
-      style={{ background: "linear-gradient(180deg,#0c1a33,#0a1120)" }}>
-      {/* Eis-Linien */}
-      <div className="absolute inset-x-0 top-1/2 h-px bg-red-500/40" />
-      <div className="absolute inset-x-0 top-[30%] h-px bg-blue-400/25" />
-      <div className="absolute inset-x-0 top-[70%] h-px bg-blue-400/25" />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full border border-blue-400/20" />
-      <div className="relative py-5 space-y-5">
-        <div className="flex justify-around px-6">{line("FORWARD", 3)}</div>
-        <div className="flex justify-around px-10">{line("DEFENDER", 2)}</div>
-        <div className="flex justify-center">{line("GOALIE", 1)}</div>
+    <div className="section" style={{paddingBottom:20}}>
+      <div className="rink">
+        <div style={{textAlign:"center",marginBottom:6}} className="eyebrow">Torhüter {counts.G}/{ROSTER_RULES.G}</div>
+        <div className="rink-line">{line("G")}</div>
+        <div style={{textAlign:"center",marginBottom:6}} className="eyebrow">Verteidigung {counts.D}/{ROSTER_RULES.D}</div>
+        <div className="rink-line">{line("D")}</div>
+        <div style={{textAlign:"center",marginBottom:6}} className="eyebrow">Sturm {counts.F}/{ROSTER_RULES.F}</div>
+        <div className="rink-line">{line("F")}</div>
       </div>
+      {state.roster.length>0 && <button className="btn btn-ghost" style={{marginTop:14}} onClick={()=>{dispatch({type:"clear"});toast("Team zurückgesetzt");}}>Team leeren</button>}
+      <div className="banner" style={{marginLeft:0,marginRight:0}}>ℹ️ <span>Tippe auf ＋ Slots oder öffne den <b>Markt</b>, um Spieler hinzuzufügen. Der Server prüft Budget, Position und Anzahl (hier als Demo im Frontend).</span></div>
     </div>
   );
 }
 
-function RosterSlot({ pos, players, onOpenPlayer, onToggle }) {
-  const max = ROSTER_RULES[pos];
+function Market({state, counts, left, dispatch, toast, openPlayer}){
+  const [pos,setPos]=useState("all");
+  const list = PLAYERS.filter(p=>pos==="all"||p.pos===pos).sort((a,b)=>b.pop-a.pop);
   return (
-    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-semibold flex items-center gap-2">
-          {pos === "GOALIE" ? "🥅" : pos === "DEFENDER" ? "🛡️" : "🏒"} {POS_LABEL[pos]}
-        </span>
-        <span className="text-xs text-slate-500 tabular-nums">{players.length} / {max}</span>
-      </div>
-      <div className="space-y-2">
-        {players.map((p) => (
-          <div key={p.id} className="flex items-center gap-3">
-            <button onClick={() => onOpenPlayer(p.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-              <span className="h-8 w-8 rounded-lg grid place-items-center text-[11px] font-bold flex-shrink-0"
-                style={{ background: TEAMS[p.team].color + "33", color: "#fff" }}>{p.num}</span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium truncate">{p.name}</span>
-                <span className="block text-[11px] text-slate-500">{TEAMS[p.team].short} · {p.pop} Beliebtheit</span>
-              </span>
-            </button>
-            <span className="tabular-nums text-sm text-slate-300 flex-shrink-0">{fmt(p.price)}</span>
-            <button onClick={() => onToggle(p.id)} className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0">
-              <Minus size={16} />
-            </button>
-          </div>
-        ))}
-        {players.length === 0 && <p className="text-sm text-slate-600">Noch keine Spieler – im Transfermarkt auswählen.</p>}
-      </div>
-    </div>
-  );
-}
-
-/* Transfermarkt */
-function Market({ roster, onOpenPlayer, onToggle }) {
-  const [filter, setFilter] = useState("ALL");
-  const risers = [...PLAYERS].sort((a, b) => b.trend - a.trend).slice(0, 3);
-  const fallers = [...PLAYERS].sort((a, b) => a.trend - b.trend).slice(0, 3);
-  const mostPicked = [...PLAYERS].sort((a, b) => b.teamsCount - a.teamsCount)[0];
-
-  const list = PLAYERS.filter((p) => filter === "ALL" || p.pos === filter).sort((a, b) => b.pop - a.pop);
-
-  return (
-    <div className="space-y-4">
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-        <p className="text-xs uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
-          <TrendingUp size={14} /> Grösste Aufsteiger
-        </p>
-        {risers.map((p) => (
-          <MoverRow key={p.id} p={p} onOpenPlayer={onOpenPlayer} />
+    <div className="section" style={{paddingBottom:20}}>
+      <div className="chips" style={{marginBottom:12}}>
+        {[["all","Alle"],["G","Torhüter"],["D","Verteidiger"],["F","Stürmer"]].map(([k,l])=>(
+          <button key={k} className={"chip "+(pos===k?"active":"")} onClick={()=>setPos(k)}>{l}</button>
         ))}
       </div>
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-        <p className="text-xs uppercase tracking-widest text-red-400 mb-2 flex items-center gap-1.5">
-          <TrendingDown size={14} /> Grösste Verlierer
-        </p>
-        {fallers.map((p) => (
-          <MoverRow key={p.id} p={p} onOpenPlayer={onOpenPlayer} />
-        ))}
-      </div>
-      <div className="rounded-2xl bg-gradient-to-br from-red-950/40 to-slate-900 border border-red-900/40 p-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-orange-400 flex items-center gap-1.5"><Flame size={14} /> Meistgewählt</p>
-          <p className="font-bold mt-1">{mostPicked.name}</p>
-          <p className="text-sm text-slate-400">{mostPicked.teamsCount} Fantasy-Teams</p>
-        </div>
-        <button onClick={() => onOpenPlayer(mostPicked.id)} className="text-slate-400"><ChevronRight /></button>
-      </div>
-
-      {/* Filter + Liste */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {[["ALL", "Alle"], ["GOALIE", "Torhüter"], ["DEFENDER", "Verteidiger"], ["FORWARD", "Stürmer"]].map(([id, l]) => (
-          <button key={id} onClick={() => setFilter(id)}
-            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border ${filter === id ? "bg-red-600 border-red-600 text-white" : "border-slate-700 text-slate-400"}`}>
-            {l}
-          </button>
-        ))}
-      </div>
-      <div className="space-y-2">
-        {list.map((p) => (
-          <div key={p.id} className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center gap-3">
-            <button onClick={() => onOpenPlayer(p.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-              <span className="h-9 w-9 rounded-lg grid place-items-center text-xs font-bold flex-shrink-0"
-                style={{ background: TEAMS[p.team].color + "33" }}>{p.num}</span>
-              <span className="min-w-0">
-                <span className="block text-sm font-medium truncate">{p.name}</span>
-                <span className="block text-[11px] text-slate-500">{TEAMS[p.team].short} · {POS_LABEL[p.pos]}</span>
-              </span>
-            </button>
-            <div className="text-right flex-shrink-0">
-              <div className="flex items-center gap-1 justify-end">
-                <PopDot v={p.pop} />
-                <span className="text-sm font-semibold tabular-nums">{p.pop}</span>
+      <div className="rowlist">
+        {list.map(p=>{
+          const owned=state.roster.includes(p.id);
+          const full=counts[p.pos]>=ROSTER_RULES[p.pos];
+          const tooExp=p.price>left;
+          const disabled=!owned && (full||tooExp);
+          return (
+            <div className="row pcard" key={p.id}>
+              <div className="pnum" style={{background:TEAMS[p.team].color}} onClick={()=>openPlayer(p.id)}>{p.num}</div>
+              <div className="grow" onClick={()=>openPlayer(p.id)}>
+                <div className="row-title">{p.firstName} {p.lastName}</div>
+                <div className="pop-wrap">
+                  <div className="pop-track"><div className="pop-fill" style={{width:p.pop+"%"}}></div></div>
+                  <span className="row-sub">Beliebtheit {p.pop}</span>
+                </div>
               </div>
-              <span className="text-[11px] text-slate-400 tabular-nums">{fmt(p.price)} Pkt</span>
+              <div style={{textAlign:"right",marginRight:4}}>
+                <div className="price">{fmt(p.price)}</div>
+                <div className="row-sub" style={{color:p.trend>=0?"var(--green)":"var(--red)"}}>{p.trend>=0?"▲":"▼"} {Math.abs(p.trend)}%</div>
+              </div>
+              <button className={"add-btn "+(owned?"owned":"")} disabled={disabled}
+                onClick={()=>{
+                  if(owned){dispatch({type:"remove",id:p.id});toast(`${p.lastName} entfernt`);}
+                  else{dispatch({type:"add",id:p.id});toast(`${p.lastName} ins Team ✓`);}
+                }}>{owned?"✓":"＋"}</button>
             </div>
-            <button onClick={() => onToggle(p.id)}
-              className={`h-8 w-8 rounded-lg grid place-items-center flex-shrink-0 ${roster.includes(p.id) ? "bg-red-600" : "bg-slate-700 hover:bg-slate-600"}`}>
-              {roster.includes(p.id) ? <Check size={16} /> : <Plus size={16} />}
-            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Transfers({openPlayer}){
+  const risers=[...PLAYERS].sort((a,b)=>b.trend-a.trend).slice(0,3);
+  const fallers=[...PLAYERS].sort((a,b)=>a.trend-b.trend).slice(0,3);
+  const popular=[...PLAYERS].sort((a,b)=>b.teams-a.teams).slice(0,3);
+  const Block=({title,arr,valFn,color})=>(
+    <div className="section" style={{paddingTop:0}}>
+      <div className="section-head"><h2 style={{fontSize:15}}>{title}</h2></div>
+      <div className="rowlist">
+        {arr.map(p=>(
+          <div className="row" key={p.id} onClick={()=>openPlayer(p.id)}>
+            <div className="pnum" style={{width:32,height:32,fontSize:14,background:TEAMS[p.team].color}}>{p.num}</div>
+            <div className="grow"><div className="row-title">{p.firstName} {p.lastName}</div><div className="row-sub">{TEAMS[p.team].short}</div></div>
+            <div className="mono" style={{fontWeight:700,color}}>{valFn(p)}</div>
           </div>
         ))}
       </div>
     </div>
   );
+  return <div style={{paddingBottom:20}}>
+    <Block title="📈 Grösste Aufsteiger" arr={risers} valFn={p=>"+"+p.trend+"%"} color="var(--green)"/>
+    <Block title="📉 Grösste Verlierer" arr={fallers} valFn={p=>p.trend+"%"} color="var(--red)"/>
+    <Block title="🔥 Meistgewählt" arr={popular} valFn={p=>p.teams+" Teams"} color="var(--gold)"/>
+  </div>;
 }
-function MoverRow({ p, onOpenPlayer }) {
-  const up = p.trend >= 0;
+
+/* Rangliste */
+function Ranking(){
+  const [tab,setTab]=useState("tips");
+  const tabs={
+    tips:{label:"🏆 Tipps", data:MEMBERS.map(m=>({...m,v:m.pts})).sort((a,b)=>b.v-a.v), suffix:""},
+    fantasy:{label:"🧠 Fantasy", data:MEMBERS.map((m,i)=>({...m,v:9650-i*280})).sort((a,b)=>b.v-a.v), suffix:""},
+    streak:{label:"🔥 Serie", data:MEMBERS.map(m=>({...m,v:m.streak})).sort((a,b)=>b.v-a.v), suffix:" Siege"},
+  };
+  const t=tabs[tab];
   return (
-    <button onClick={() => onOpenPlayer(p.id)} className="w-full flex items-center justify-between py-1.5 text-left">
-      <span className="flex items-center gap-2 min-w-0">
-        <span className="h-7 w-7 rounded-md grid place-items-center text-[10px] font-bold flex-shrink-0" style={{ background: TEAMS[p.team].color + "33" }}>{p.num}</span>
-        <span className="text-sm truncate">{p.name}</span>
-      </span>
-      <span className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-red-400"}`}>
-        {up ? "+" : ""}{p.trend}%
-      </span>
-    </button>
-  );
-}
-function PopDot({ v }) {
-  const c = v >= 80 ? "#10b981" : v >= 60 ? "#3b82f6" : v >= 40 ? "#eab308" : "#ef4444";
-  return <span className="h-2 w-2 rounded-full inline-block" style={{ background: c }} />;
-}
-
-/* ================================================================== */
-/*  Rangliste                                                          */
-/* ================================================================== */
-function RankingView({ roster, favorite }) {
-  const [board, setBoard] = useState("tip");
-  const tabs = [
-    ["tip", "🏆 Tipps"],
-    ["fantasy", "🧠 Fantasy"],
-    ["pop", "❤️ Beliebtheit"],
-    ["streak", "🔥 Serie"],
-  ];
-
-  const tip = [...MEMBERS].sort((a, b) => b.tipPts - a.tipPts);
-  const streak = [...MEMBERS].sort((a, b) => b.streak - a.streak);
-  // Fantasy & Pop: aus Mitgliedern deterministisch abgeleitet
-  const fantasy = MEMBERS.map((m, i) => ({ ...m, val: 148 + ((i * 37) % 60) })).sort((a, b) => b.val - a.val);
-  const pop = MEMBERS.map((m, i) => ({ ...m, val: 68 + ((i * 53) % 28) })).sort((a, b) => b.val - a.val);
-
-  return (
-    <div className="px-4 pt-6 space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Rangliste</h1>
-      <p className="text-slate-400 text-sm -mt-2">Hockeyrunde 2026/27 · Saison 2026/27</p>
-
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {tabs.map(([id, l]) => (
-          <button key={id} onClick={() => setBoard(id)}
-            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border ${board === id ? "bg-red-600 border-red-600 text-white" : "border-slate-700 text-slate-400"}`}>
-            {l}
-          </button>
-        ))}
+    <div>
+      <div className="section" style={{paddingTop:18}}><h1 style={{fontSize:24,fontWeight:700}}>Rangliste</h1></div>
+      <div className="section" style={{paddingTop:4,paddingBottom:8}}>
+        <div className="chips">{Object.entries(tabs).map(([k,v])=>(
+          <button key={k} className={"chip "+(tab===k?"active":"")} onClick={()=>setTab(k)}>{v.label}</button>
+        ))}</div>
       </div>
-
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 divide-y divide-slate-800">
-        {board === "tip" && tip.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${fmt(m.tipPts)} Pkt`} />)}
-        {board === "fantasy" && fantasy.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${m.val} Fantasy-Pkt`} />)}
-        {board === "pop" && pop.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`Ø ${m.val} Beliebtheit`} />)}
-        {board === "streak" && streak.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${m.streak} in Serie`} />)}
+      <div className="section" style={{paddingBottom:20}}>
+        <div className="rowlist">
+          {t.data.map((m,i)=>(
+            <div className="row" key={m.name}>
+              <div className={"rank-badge "+(i<3?"g"+(i+1):"")}>{i+1}</div>
+              <div className="avatar" style={{background:m.me?"var(--red-soft)":"var(--elevated)",color:m.me?"var(--red)":"var(--text)"}}>{m.name[0]}</div>
+              <div className="grow"><div className="row-title">{m.name}{m.me&&" (Du)"}</div></div>
+              <div className="row-val">{fmt(m.v)}{t.suffix}</div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
-function RankRow({ i, name, val }) {
-  const medal = ["🥇", "🥈", "🥉"][i];
-  return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <span className="w-7 text-center font-bold text-slate-400">{medal || i + 1}</span>
-      <div className="h-8 w-8 rounded-full bg-slate-700 grid place-items-center text-sm font-bold flex-shrink-0">{name[0]}</div>
-      <span className={`flex-1 ${name === ME ? "text-white font-semibold" : "text-slate-300"}`}>{name}{name === ME && " · du"}</span>
-      <span className="tabular-nums text-sm text-slate-300">{val}</span>
-    </div>
-  );
-}
 
-/* ================================================================== */
-/*  Profil                                                             */
-/* ================================================================== */
-function ProfileView({ tipBalance, favorite, onOpenPlayer, myBets, games }) {
-  const fav = PLAYERS.find((p) => p.id === favorite);
-  const achievements = [
-    { icon: "🔥", name: "Hot Hand", desc: "5 richtige Tipps hintereinander", got: true },
-    { icon: "❤️", name: "Fan", desc: "Lieblingsspieler ausgewählt", got: true },
-    { icon: "🧠", name: "Fantasy Manager", desc: "Fantasy-Team erstellt", got: true },
-    { icon: "🎯", name: "Scharfschütze", desc: "10 richtige Tipps", got: false },
-    { icon: "📈", name: "Scout", desc: "Spieler vor grossem Anstieg gewählt", got: false },
-    { icon: "🏆", name: "Champion", desc: "Saison gewonnen", got: false },
-  ];
-  const myTips = games.filter((g) => myBets[g.id]);
-
+/* Profil */
+function Profile({state, toast, dispatch, openPlayer}){
+  const fav = state.favorite? PLAYERS.find(p=>p.id===state.favorite) : null;
+  const myTips = GAMES.filter(g=>g.myTip);
   return (
-    <div className="px-4 pt-6 space-y-4">
-      <div className="flex items-center gap-4">
-        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 grid place-items-center text-2xl font-extrabold">L</div>
-        <div>
-          <h1 className="text-2xl font-bold">Luca</h1>
-          <p className="text-slate-400 text-sm">Hockeyrunde 2026/27 · Admin</p>
-        </div>
+    <div>
+      <div className="section" style={{paddingTop:22,textAlign:"center"}}>
+        <div className="avatar" style={{width:74,height:74,fontSize:30,margin:"0 auto 12px",borderRadius:22,background:"linear-gradient(135deg,var(--red),#8a1620)"}}>L</div>
+        <h1 style={{fontSize:22,fontWeight:700}}>Luca</h1>
+        <div className="muted" style={{fontSize:13}}>luca@example.ch · Mitglied seit Sept. 2026</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500">Tipp-Guthaben</p>
-          <p className="text-xl font-bold tabular-nums mt-1">{fmt(tipBalance)}</p>
-        </div>
-        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500">Siegesserie</p>
-          <p className="text-xl font-bold mt-1 flex items-center gap-1"><Flame size={18} className="text-orange-500" /> 5</p>
+      <div className="section">
+        <div className="statgrid">
+          <div className="stat"><div className="n">{fmt(state.balance)}</div><div className="l">Tipp-Guthaben</div></div>
+          <div className="stat"><div className="n">5</div><div className="l">Siegesserie 🔥</div></div>
+          <div className="stat"><div className="n">38</div><div className="l">Getippte Spiele</div></div>
+          <div className="stat"><div className="n">24</div><div className="l">Gewonnen ✅</div></div>
         </div>
       </div>
 
       {/* Lieblingsspieler */}
-      {fav && (
-        <button onClick={() => onOpenPlayer(fav.id)} className="w-full rounded-2xl bg-gradient-to-br from-red-950/40 to-slate-900 border border-red-900/40 p-4 flex items-center gap-3 text-left">
-          <Heart size={20} className="fill-red-500 text-red-500 flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] uppercase tracking-widest text-red-400">Lieblingsspieler</p>
-            <p className="font-bold truncate">{fav.name}</p>
-            <p className="text-sm text-slate-400">{TEAMS[fav.team].short} · {fav.favCount} Fans in der Gruppe</p>
-          </div>
-          <ChevronRight className="text-slate-500 flex-shrink-0" />
-        </button>
-      )}
+      <div className="section">
+        <div className="section-head"><h2>❤️ Lieblingsspieler</h2></div>
+        {fav
+          ? <div className="card" style={{display:"flex",alignItems:"center",gap:12}} onClick={()=>openPlayer(fav.id)}>
+              <div className="pnum" style={{width:44,height:44,fontSize:18,background:TEAMS[fav.team].color}}>{fav.num}</div>
+              <div className="grow"><div style={{fontWeight:700}}>{fav.firstName} {fav.lastName}</div><div className="row-sub">{TEAMS[fav.team].name} · {fav.fav} Fans in der Gruppe</div></div>
+              <span style={{fontSize:22}}>❤️</span>
+            </div>
+          : <div className="card muted" style={{textAlign:"center",fontSize:13}}>Noch keinen Lieblingsspieler gewählt. Öffne einen Spieler im Markt.</div>}
+      </div>
 
       {/* Meine Tipps */}
-      <div>
-        <h2 className="font-semibold mb-2 flex items-center gap-2"><Target size={16} className="text-red-500" /> Meine Tipps</h2>
-        <div className="space-y-2">
-          {myTips.map((g) => {
-            const b = myBets[g.id];
-            const finished = g.status === "FINISHED";
-            const won = g.myBet?.won;
+      <div className="section">
+        <div className="section-head"><h2>Meine Tipps</h2></div>
+        <div className="rowlist">
+          {myTips.map(g=>{
+            const out = g.status==="FINISHED"? (g.won?"win":"lose") : "open";
+            const label = g.status==="FINISHED"? (g.won?`✅ +${fmt(g.myTip.amt)}`:`❌ -${fmt(g.myTip.amt)}`) : "⏳ Offen";
             return (
-              <div key={g.id} className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-between text-sm">
-                <div>
-                  <p className="font-medium">{TEAMS[g.home].short} – {TEAMS[g.away].short}</p>
-                  <p className="text-slate-500 text-xs">{TEAMS[b.team].tag} {TEAMS[b.team].short} · {fmt(b.amount)}</p>
-                </div>
-                {finished ? (
-                  <span className={won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
-                    {won ? `✅ +${fmt(g.myBet.payout)}` : `❌ −${fmt(b.amount)}`}
-                  </span>
-                ) : (
-                  <span className="text-slate-400">⏳ Offen</span>
-                )}
+              <div className="row" key={g.id}>
+                <div className="grow"><div className="row-title">{TEAMS[g.home].short} – {TEAMS[g.away].short}</div><div className="row-sub">{TEAMS[g.myTip.t].tag} {TEAMS[g.myTip.t].short} · {fmt(g.myTip.amt)} Pkt</div></div>
+                <span className={"tag-outcome "+out}>{label}</span>
               </div>
             );
           })}
@@ -1075,91 +720,132 @@ function ProfileView({ tipBalance, favorite, onOpenPlayer, myBets, games }) {
       </div>
 
       {/* Achievements */}
-      <div>
-        <h2 className="font-semibold mb-2 flex items-center gap-2"><Award size={16} className="text-yellow-500" /> Achievements</h2>
-        <div className="grid grid-cols-3 gap-2">
-          {achievements.map((a) => (
-            <div key={a.name} className={`rounded-xl border p-3 text-center ${a.got ? "bg-slate-900 border-slate-700" : "bg-slate-900/40 border-slate-800 opacity-50"}`}>
-              <div className="text-2xl">{a.icon}</div>
-              <p className="text-[11px] font-medium mt-1 leading-tight">{a.name}</p>
+      <div className="section" style={{paddingBottom:20}}>
+        <div className="section-head"><h2>Erfolge</h2><span className="muted" style={{fontSize:12}}>{ACHIEVEMENTS.filter(a=>a.got).length}/{ACHIEVEMENTS.length}</span></div>
+        <div className="rowlist">
+          {ACHIEVEMENTS.map(a=>(
+            <div className={"row ach "+(a.got?"":"locked")} key={a.name}>
+              <div className="ico">{a.icon}</div>
+              <div className="grow"><div className="row-title">{a.name}</div><div className="row-sub">{a.desc}</div></div>
+              {a.got && <span style={{color:"var(--green)"}}>✓</span>}
             </div>
           ))}
         </div>
       </div>
-
-      <button className="w-full rounded-xl border border-slate-800 py-3 text-slate-400 text-sm mt-2">Abmelden</button>
-      <p className="text-center text-[11px] text-slate-600 pt-1">Demo · Daten werden nicht gespeichert</p>
     </div>
   );
 }
 
-/* ================================================================== */
-/*  Spieler-Modal (Detailseite)                                        */
-/* ================================================================== */
-function PlayerModal({ player, isFav, inRoster, onFav, onToggle, onClose }) {
-  const p = player;
-  const T = TEAMS[p.team];
+/* Spieler-Detail */
+function PlayerSheet({id, state, dispatch, toast, onClose}){
+  const p=PLAYERS.find(x=>x.id===id);
+  const owned=state.roster.includes(p.id);
+  const isFav=state.favorite===p.id;
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 pb-8" style={{ animation: "slideup .2s ease" }}>
-        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
-        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500"><X size={20} /></button>
-
-        <div className="flex items-center gap-4 mb-5">
-          <div className="h-16 w-16 rounded-2xl grid place-items-center text-2xl font-extrabold" style={{ background: T.color }}>
-            {p.num}
+    <div className="backdrop" onClick={onClose}>
+      <div className="sheet" onClick={e=>e.stopPropagation()}>
+        <div className="grabber"></div>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+          <div className="pnum" style={{width:54,height:54,fontSize:22,background:TEAMS[p.team].color}}>{p.num}</div>
+          <div><div style={{fontWeight:700,fontSize:20}}>{p.firstName} {p.lastName}</div><div className="muted">{TEAMS[p.team].name} · {posLabel[p.pos]}</div></div>
+        </div>
+        <div className="statgrid" style={{marginBottom:14}}>
+          <div className="stat"><div className="n" style={{color:"var(--ice)"}}>{p.pop}<span style={{fontSize:14,color:"var(--muted)"}}>/100</span></div><div className="l">Popularity Score</div></div>
+          <div className="stat"><div className="n" style={{color:"var(--gold)"}}>{fmt(p.price)}</div><div className="l">Fantasy-Preis</div></div>
+          <div className="stat"><div className="n">{p.teams}</div><div className="l">Fantasy-Teams</div></div>
+          <div className="stat"><div className="n">{p.fav} ❤️</div><div className="l">Lieblingsspieler</div></div>
+        </div>
+        <div className="card" style={{background:"var(--elevated)",marginBottom:16}}>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13}}>
+            <span className="muted">Trend diese Woche</span>
+            <span style={{fontWeight:700,color:p.trend>=0?"var(--green)":"var(--red)"}}>{p.trend>=0?"▲ +":"▼ "}{p.trend}%</span>
           </div>
-          <div>
-            <h2 className="text-xl font-bold">{p.name}</h2>
-            <p className="text-slate-400 text-sm">{T.name} · {POS_LABEL[p.pos]}</p>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginTop:8}}>
+            <span className="muted">Spieler des Spiels</span><span style={{fontWeight:700}}>{p.potg}×</span>
           </div>
         </div>
-
-        {/* Popularity gross */}
-        <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-4 mb-3">
-          <div className="flex items-end justify-between">
-            <div>
-              <p className="text-[11px] uppercase tracking-widest text-slate-500">Popularity Score</p>
-              <p className="text-4xl font-extrabold tabular-nums">{p.pop}<span className="text-lg text-slate-500">/100</span></p>
-            </div>
-            <div className="text-right">
-              <p className="text-[11px] uppercase tracking-widest text-slate-500">Fantasy-Preis</p>
-              <p className="text-2xl font-bold tabular-nums text-red-400">{fmt(p.price)}</p>
-            </div>
-          </div>
-          <div className="h-2 rounded-full bg-slate-800 mt-3 overflow-hidden">
-            <div className="h-full" style={{ width: `${p.pop}%`, background: p.pop >= 80 ? "#10b981" : p.pop >= 60 ? "#3b82f6" : p.pop >= 40 ? "#eab308" : "#ef4444" }} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
-          <MiniStat icon={<TrendingUp size={15} className={p.trend >= 0 ? "text-emerald-400" : "text-red-400"} />} l="Diese Woche" v={`${p.trend >= 0 ? "+" : ""}${p.trend}%`} />
-          <MiniStat icon={<Users size={15} className="text-blue-400" />} l="Fantasy-Teams" v={p.teamsCount} />
-          <MiniStat icon={<Heart size={15} className="text-red-400" />} l="Lieblingsspieler" v={`${p.favCount} Mitgl.`} />
-          <MiniStat icon={<Trophy size={15} className="text-yellow-400" />} l="Spieler des Spiels" v={`${p.potg}×`} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <button onClick={onFav}
-            className={`rounded-xl py-3 font-semibold flex items-center justify-center gap-2 border ${isFav ? "bg-red-600 border-red-600" : "border-slate-700 text-slate-300"}`}>
-            <Heart size={18} className={isFav ? "fill-white" : ""} /> {isFav ? "Liebling" : "Als Liebling"}
+        <div style={{display:"flex",gap:10}}>
+          <button className={"btn "+(isFav?"btn-primary":"btn-ghost")} style={{flex:1}}
+            onClick={()=>{dispatch({type:"fav",id:isFav?null:p.id});toast(isFav?"Lieblingsspieler entfernt":`❤️ ${p.lastName} ist dein Liebling`);}}>
+            {isFav?"❤️ Liebling":"♡ Als Liebling"}
           </button>
-          <button onClick={onToggle}
-            className={`rounded-xl py-3 font-semibold flex items-center justify-center gap-2 ${inRoster ? "bg-slate-700" : "bg-emerald-600"}`}>
-            {inRoster ? <><Minus size={18} /> Entfernen</> : <><Plus size={18} /> Ins Team</>}
-          </button>
+          <button className={"btn "+(owned?"btn-ghost":"btn-primary")} style={{flex:1}}
+            onClick={()=>{
+              if(owned){dispatch({type:"remove",id:p.id});toast(`${p.lastName} entfernt`);}
+              else{dispatch({type:"add",id:p.id});toast(`${p.lastName} ins Team ✓`);}
+            }}>{owned?"− Entfernen":"＋ Ins Team"}</button>
         </div>
       </div>
-      <style>{`@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
     </div>
   );
 }
-function MiniStat({ icon, l, v }) {
+
+/* ============ APP ============ */
+function reducer(state, a){
+  switch(a.type){
+    case "bet": return {...state, balance: state.balance - a.amt};
+    case "add": {
+      const p=PLAYERS.find(x=>x.id===a.id);
+      const counts={G:0,D:0,F:0}; state.roster.forEach(id=>counts[PLAYERS.find(x=>x.id===id).pos]++);
+      const spent=state.roster.reduce((s,id)=>s+PLAYERS.find(x=>x.id===id).price,0);
+      if(state.roster.includes(a.id)) return state;
+      if(counts[p.pos]>=ROSTER_RULES[p.pos]) return state;
+      if(spent+p.price>START_BUDGET) return state;
+      return {...state, roster:[...state.roster, a.id]};
+    }
+    case "remove": return {...state, roster: state.roster.filter(id=>id!==a.id)};
+    case "clear": return {...state, roster:[]};
+    case "fav": return {...state, favorite:a.id};
+    default: return state;
+  }
+}
+
+function App(){
+  const [tab,setTab]=useState("home");
+  const [state,dispatch]=React.useReducer(reducer,{balance:7850, roster:[1,6], favorite:1});
+  const [tipGame,setTipGame]=useState(null);
+  const [playerId,setPlayerId]=useState(null);
+  const [toastMsg,setToastMsg]=useState(null);
+  const toast=(m)=>{setToastMsg(m); setTimeout(()=>setToastMsg(null),1800);};
+
+  const confirmTip=(g,team,amt)=>{
+    dispatch({type:"bet",amt});
+    g.myTip={t:team,amt};                 // Demo: lokal setzen
+    g.pool[team]=(g.pool[team]||0)+amt;
+    g.tips=[...g.tips,{u:"Luca",t:team,amt}];
+    setTipGame(null);
+    toast(`Tipp abgegeben: ${amt} auf ${TEAMS[team].short}`);
+  };
+
   return (
-    <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-3">
-      <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">{icon}{l}</div>
-      <p className="font-bold mt-0.5 tabular-nums">{v}</p>
+    <div className="app">
+      <div className="topbar">
+        <div className="brand"><span className="puck">🏒</span> HockeyPool</div>
+        <div className="balance-chip"><span className="dot"></span> {fmt(state.balance)}</div>
+      </div>
+
+      {tab==="home" && <Dashboard state={state} go={setTab} openTip={setTipGame}/>}
+      {tab==="games" && <Games state={state} openTip={setTipGame}/>}
+      {tab==="fantasy" && <Fantasy state={state} dispatch={dispatch} toast={toast} openPlayer={setPlayerId}/>}
+      {tab==="rank" && <Ranking/>}
+      {tab==="profile" && <Profile state={state} dispatch={dispatch} toast={toast} openPlayer={setPlayerId}/>}
+
+      <div className="bottomnav">
+        {[["home","🏠","Übersicht"],["games","🏒","Spiele"],["fantasy","🧠","Fantasy"],["rank","🏆","Rangliste"],["profile","👤","Profil"]].map(([k,ic,l])=>(
+          <button key={k} className={"navbtn "+(tab===k?"active":"")} onClick={()=>setTab(k)}>
+            <span className="ico">{ic}</span>{l}
+          </button>
+        ))}
+      </div>
+
+      {tipGame && <TipSheet g={tipGame} balance={state.balance} onClose={()=>setTipGame(null)} onConfirm={confirmTip}/>}
+      {playerId && <PlayerSheet id={playerId} state={state} dispatch={dispatch} toast={toast} onClose={()=>setPlayerId(null)}/>}
+      {toastMsg && <div className="toast">{toastMsg}</div>}
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
