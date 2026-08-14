@@ -1,0 +1,1165 @@
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Home, Swords, Brain, Trophy, User, Clock, Lock, Flame, Heart,
+  TrendingUp, TrendingDown, Users, Check, X, ChevronRight, Star,
+  ArrowLeft, Wallet, Shield, Target, Award, Zap, Plus, Minus, Circle,
+} from "lucide-react";
+
+/* ------------------------------------------------------------------ */
+/*  HockeyPool Schweiz — interaktiver MVP-Prototyp (Mock-Daten)        */
+/*  Alle Berechnungen laufen hier im Frontend nur zu Demo-Zwecken.     */
+/*  In der Produktivversion gehören sie serverseitig (siehe Notiz).    */
+/* ------------------------------------------------------------------ */
+
+/* ---- Konfiguration Preisformel (deterministisch, monoton) --------- */
+const PRICE_CONFIG = { base: 300, range: 1700, exponent: 1.3, roundTo: 50 };
+function priceFromPopularity(score) {
+  const { base, range, exponent, roundTo } = PRICE_CONFIG;
+  const raw = base + Math.pow(score / 100, exponent) * range;
+  return Math.round(raw / roundTo) * roundTo;
+}
+
+/* ---- Teams -------------------------------------------------------- */
+const TEAMS = {
+  ZSC: { name: "ZSC Lions", short: "ZSC", color: "#2563eb", tag: "🦁" },
+  SCB: { name: "SC Bern", short: "SCB", color: "#dc2626", tag: "🐻" },
+  ZUG: { name: "EV Zug", short: "ZUG", color: "#0ea5e9", tag: "⚡" },
+  DAV: { name: "HC Davos", short: "HCD", color: "#eab308", tag: "🏔️" },
+  LAU: { name: "Lausanne HC", short: "LHC", color: "#1e40af", tag: "🦅" },
+  FRI: { name: "Fribourg-Gottéron", short: "FRI", color: "#0f766e", tag: "🐉" },
+  GSHC: { name: "Genève-Servette", short: "GSHC", color: "#7c1d1d", tag: "🦅" },
+  BIE: { name: "EHC Biel", short: "BIE", color: "#eab308", tag: "🐝" },
+};
+
+/* ---- Spieler (fiktiv, um keine realen Personendaten zu verwenden) -- */
+const rawPlayers = [
+  { id: "p1", first: "Nael", last: "Brunner", team: "ZSC", pos: "FORWARD", num: 71, pop: 92, potg: 8 },
+  { id: "p2", first: "Timo", last: "Wiget", team: "SCB", pos: "FORWARD", num: 9, pop: 88, potg: 5 },
+  { id: "p3", first: "Loïc", last: "Aebischer", team: "ZUG", pos: "DEFENDER", num: 44, pop: 84, potg: 3 },
+  { id: "p4", first: "Robin", last: "Kälin", team: "DAV", pos: "GOALIE", num: 30, pop: 81, potg: 6 },
+  { id: "p5", first: "Sven", last: "Roth", team: "LAU", pos: "FORWARD", num: 17, pop: 79, potg: 4 },
+  { id: "p6", first: "Elia", last: "Meyer", team: "FRI", pos: "DEFENDER", num: 55, pop: 74, potg: 2 },
+  { id: "p7", first: "Marc", last: "Steiner", team: "GSHC", pos: "GOALIE", num: 32, pop: 72, potg: 4 },
+  { id: "p8", first: "Dario", last: "Frei", team: "BIE", pos: "FORWARD", num: 22, pop: 71, potg: 1 },
+  { id: "p9", first: "Levin", last: "Graf", team: "ZSC", pos: "DEFENDER", num: 6, pop: 68, potg: 2 },
+  { id: "p10", first: "Yanis", last: "Baumann", team: "SCB", pos: "FORWARD", num: 88, pop: 66, potg: 3 },
+  { id: "p11", first: "Kilian", last: "Suter", team: "ZUG", pos: "FORWARD", num: 15, pop: 63, potg: 1 },
+  { id: "p12", first: "Andri", last: "Hofer", team: "DAV", pos: "DEFENDER", num: 4, pop: 61, potg: 0 },
+  { id: "p13", first: "Joel", last: "Zimmermann", team: "LAU", pos: "GOALIE", num: 29, pop: 58, potg: 2 },
+  { id: "p14", first: "Nino", last: "Weber", team: "FRI", pos: "FORWARD", num: 11, pop: 54, potg: 1 },
+  { id: "p15", first: "Silvan", last: "Keller", team: "GSHC", pos: "DEFENDER", num: 77, pop: 49, potg: 0 },
+  { id: "p16", first: "Rafael", last: "Marti", team: "BIE", pos: "FORWARD", num: 24, pop: 46, potg: 1 },
+  { id: "p17", first: "Colin", last: "Schmid", team: "ZSC", pos: "FORWARD", num: 33, pop: 41, potg: 0 },
+  { id: "p18", first: "Dominik", last: "Huber", team: "SCB", pos: "DEFENDER", num: 8, pop: 38, potg: 0 },
+  { id: "p19", first: "Fabio", last: "Lehmann", team: "ZUG", pos: "GOALIE", num: 1, pop: 35, potg: 1 },
+  { id: "p20", first: "Enea", last: "Bianchi", team: "DAV", pos: "FORWARD", num: 19, pop: 31, potg: 0 },
+  { id: "p21", first: "Luca", last: "Gerber", team: "LAU", pos: "DEFENDER", num: 5, pop: 28, potg: 0 },
+  { id: "p22", first: "Simon", last: "Moser", team: "FRI", pos: "FORWARD", num: 27, pop: 24, potg: 0 },
+];
+const PLAYERS = rawPlayers.map((p) => ({
+  ...p,
+  name: `${p.first} ${p.last}`,
+  price: priceFromPopularity(p.pop),
+  trend: [18, 14, 11, 6, 4, 2, 0, -3, -6, -9, -12][p.id.length] ?? (p.pop > 60 ? 6 : -4),
+  teamsCount: Math.max(2, Math.round(p.pop * 1.4)),
+  favCount: Math.round(p.pop / 2.2),
+}));
+// stabile, deterministische Trend-Werte
+PLAYERS.forEach((p, i) => {
+  const seq = [18, -15, 14, 9, -10, 11, 5, 7, -6, 4, 2, -4, 8, 3, -8, 6, -2, -11, 1, -5, -3, 10];
+  p.trend = seq[i % seq.length];
+});
+
+const ROSTER_RULES = { GOALIE: 2, DEFENDER: 5, FORWARD: 8 };
+const POS_LABEL = { GOALIE: "Torhüter", DEFENDER: "Verteidiger", FORWARD: "Stürmer" };
+
+/* ---- Gruppe & Mitglieder ------------------------------------------ */
+const ME = "Luca";
+const MEMBERS = [
+  { name: "Luca", tipPts: 8450, streak: 5 },
+  { name: "Marco", tipPts: 8120, streak: 2 },
+  { name: "Sarah", tipPts: 7950, streak: 3 },
+  { name: "Jonas", tipPts: 7500, streak: 0 },
+  { name: "Nina", tipPts: 7180, streak: 1 },
+  { name: "Reto", tipPts: 6940, streak: 4 },
+];
+
+/* ---- Spiele (Zeiten relativ zu jetzt für Demo) -------------------- */
+const now = Date.now();
+const MIN = 60 * 1000;
+const initialGames = [
+  {
+    id: "g1", home: "ZSC", away: "SCB",
+    start: now + 45 * MIN, status: "OPEN",
+    homeScore: null, awayScore: null,
+    groupBets: [
+      { user: "Marco", team: "SCB", amount: 500 },
+      { user: "Sarah", team: "ZSC", amount: 100 },
+      { user: "Jonas", team: "SCB", amount: 250 },
+    ],
+  },
+  {
+    id: "g2", home: "ZUG", away: "DAV",
+    start: now + 4 * 60 * MIN, status: "OPEN",
+    homeScore: null, awayScore: null, groupBets: [],
+  },
+  {
+    id: "g3", home: "LAU", away: "FRI",
+    start: now + 30 * MIN, status: "LOCKED",
+    homeScore: null, awayScore: null,
+    groupBets: [
+      { user: "Marco", team: "LAU", amount: 200 },
+      { user: "Sarah", team: "FRI", amount: 150 },
+    ],
+  },
+  {
+    id: "g4", home: "GSHC", away: "BIE",
+    start: now - 90 * MIN, status: "LIVE",
+    homeScore: 2, awayScore: 1, groupBets: [],
+  },
+  {
+    id: "g5", home: "DAV", away: "ZUG",
+    start: now - 5 * 60 * MIN, status: "FINISHED",
+    homeScore: 1, awayScore: 4,
+    result: "ZUG",
+    myBet: { team: "ZUG", amount: 100, won: true, payout: 190 },
+    groupBets: [],
+  },
+];
+
+/* ---- kleine Helfer ------------------------------------------------ */
+const fmt = (n) => n.toLocaleString("de-CH").replace(/,/g, "'");
+function fmtCountdown(ms) {
+  if (ms <= 0) return "00:00:00";
+  const s = Math.floor(ms / 1000);
+  const h = String(Math.floor(s / 3600)).padStart(2, "0");
+  const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+  const sec = String(s % 60).padStart(2, "0");
+  return `${h}:${m}:${sec}`;
+}
+const TIP_LOCK_MS = 60 * MIN;
+
+/* ================================================================== */
+/*  APP                                                               */
+/* ================================================================== */
+export default function App() {
+  const [tab, setTab] = useState("home");
+  const [tick, setTick] = useState(Date.now());
+  const [tipBalance, setTipBalance] = useState(7850);
+  const [games, setGames] = useState(initialGames);
+  const [myBets, setMyBets] = useState({
+    g1: { team: "ZSC", amount: 250 },
+    g5: { team: "ZUG", amount: 100 },
+  });
+  const [roster, setRoster] = useState(["p1", "p3", "p4", "p9", "p10", "p6"]);
+  const [favorite, setFavorite] = useState("p1");
+  const [tipModal, setTipModal] = useState(null); // gameId
+  const [playerModal, setPlayerModal] = useState(null); // playerId
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    const t = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const showToast = (msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2600);
+  };
+
+  const spent = useMemo(
+    () => roster.reduce((s, id) => s + (PLAYERS.find((p) => p.id === id)?.price || 0), 0),
+    [roster]
+  );
+  const FANTASY_BUDGET = 10000;
+
+  /* Tipp abgeben */
+  const placeBet = (gameId, team, amount) => {
+    setTipBalance((b) => b - amount);
+    setMyBets((m) => ({ ...m, [gameId]: { team, amount } }));
+    setGames((gs) =>
+      gs.map((g) =>
+        g.id === gameId
+          ? { ...g, groupBets: [...g.groupBets, { user: ME, team, amount }] }
+          : g
+      )
+    );
+    setTipModal(null);
+    showToast(`Tipp abgegeben: ${fmt(amount)} auf ${TEAMS[team].short}`);
+  };
+
+  /* Fantasy add/remove */
+  const toggleRoster = (id) => {
+    const p = PLAYERS.find((x) => x.id === id);
+    if (roster.includes(id)) {
+      setRoster((r) => r.filter((x) => x !== id));
+      return;
+    }
+    const posCount = roster.filter(
+      (r) => PLAYERS.find((x) => x.id === r)?.pos === p.pos
+    ).length;
+    if (posCount >= ROSTER_RULES[p.pos]) {
+      showToast(`${POS_LABEL[p.pos]} sind voll (${ROSTER_RULES[p.pos]})`);
+      return;
+    }
+    if (spent + p.price > FANTASY_BUDGET) {
+      showToast("Budget überschritten");
+      return;
+    }
+    setRoster((r) => [...r, id]);
+  };
+
+  return (
+    <div className="min-h-screen w-full text-slate-100 flex justify-center antialiased" style={{ background: "#0a0f1c" }}>
+      <style>{`
+        .text-\\[10px\\]{font-size:10px;line-height:1.1}
+        .text-\\[11px\\]{font-size:11px;line-height:1.25}
+        .w-\\[90\\%\\]{width:90%}
+        .max-w-\\[60px\\]{max-width:60px}
+        .top-\\[30\\%\\]{top:30%}
+        .top-\\[70\\%\\]{top:70%}
+        input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+      `}</style>
+      <div className="w-full max-w-md relative pb-24" style={{ minHeight: "100vh" }}>
+        {/* Ice ambient top glow */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-56" style={{ background: "linear-gradient(180deg, rgba(23,37,84,0.55), rgba(10,15,28,0))" }} />
+
+        <div className="relative">
+          {tab === "home" && (
+            <Dashboard
+              tick={tick} games={games} myBets={myBets} tipBalance={tipBalance}
+              spent={spent} budget={FANTASY_BUDGET}
+              onTip={(id) => setTipModal(id)} onGoto={setTab}
+            />
+          )}
+          {tab === "games" && (
+            <GamesView tick={tick} games={games} myBets={myBets} onTip={(id) => setTipModal(id)} />
+          )}
+          {tab === "fantasy" && (
+            <FantasyView
+              roster={roster} spent={spent} budget={FANTASY_BUDGET}
+              onToggle={toggleRoster} onOpenPlayer={(id) => setPlayerModal(id)}
+            />
+          )}
+          {tab === "rank" && <RankingView roster={roster} favorite={favorite} />}
+          {tab === "profile" && (
+            <ProfileView
+              tipBalance={tipBalance} favorite={favorite}
+              onOpenPlayer={(id) => setPlayerModal(id)} myBets={myBets} games={games}
+            />
+          )}
+        </div>
+
+        {/* Tipp-Modal */}
+        {tipModal && (
+          <TipModal
+            game={games.find((g) => g.id === tipModal)}
+            balance={tipBalance} tick={tick}
+            existing={myBets[tipModal]}
+            onClose={() => setTipModal(null)}
+            onConfirm={placeBet}
+          />
+        )}
+
+        {/* Spieler-Modal */}
+        {playerModal && (
+          <PlayerModal
+            player={PLAYERS.find((p) => p.id === playerModal)}
+            isFav={favorite === playerModal}
+            inRoster={roster.includes(playerModal)}
+            onFav={() => { setFavorite(playerModal); showToast("Lieblingsspieler gesetzt"); }}
+            onToggle={() => toggleRoster(playerModal)}
+            onClose={() => setPlayerModal(null)}
+          />
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-md w-[90%]">
+            <div className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-center shadow-2xl shadow-black/60">
+              {toast}
+            </div>
+          </div>
+        )}
+
+        <BottomNav tab={tab} setTab={setTab} />
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Bottom-Navigation                                                  */
+/* ================================================================== */
+function BottomNav({ tab, setTab }) {
+  const items = [
+    { id: "home", label: "Übersicht", Icon: Home },
+    { id: "games", label: "Spiele", Icon: Swords },
+    { id: "fantasy", label: "Fantasy", Icon: Brain },
+    { id: "rank", label: "Rangliste", Icon: Trophy },
+    { id: "profile", label: "Profil", Icon: User },
+  ];
+  return (
+    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-40">
+      <div className="mx-3 mb-3 rounded-2xl bg-slate-900/90 backdrop-blur border border-slate-800 shadow-2xl shadow-black/60 grid grid-cols-5">
+        {items.map(({ id, label, Icon }) => {
+          const active = tab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => setTab(id)}
+              className="flex flex-col items-center gap-1 py-2.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 rounded-2xl"
+            >
+              <Icon size={20} className={active ? "text-red-500" : "text-slate-500"} />
+              <span className={`text-[10px] font-medium ${active ? "text-white" : "text-slate-500"}`}>
+                {label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/* ================================================================== */
+/*  Dashboard / Übersicht                                              */
+/* ================================================================== */
+function Dashboard({ tick, games, myBets, tipBalance, spent, budget, onTip, onGoto }) {
+  const next = games.find((g) => g.status === "OPEN") || games[0];
+  const lockAt = next.start - TIP_LOCK_MS;
+  const remaining = lockAt - tick;
+  const myBet = myBets[next.id];
+  const ranking = [...MEMBERS].sort((a, b) => b.tipPts - a.tipPts);
+
+  return (
+    <div className="px-4 pt-6 space-y-4">
+      <header className="flex items-center justify-between">
+        <div>
+          <p className="text-slate-400 text-sm">Willkommen zurück</p>
+          <h1 className="text-2xl font-bold tracking-tight">Hallo Luca 👋</h1>
+        </div>
+        <div className="h-11 w-11 rounded-full bg-gradient-to-br from-red-500 to-red-700 grid place-items-center font-bold text-lg">
+          L
+        </div>
+      </header>
+
+      {/* Punktestand */}
+      <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-5">
+        <div className="flex items-center gap-2 text-slate-400 text-xs uppercase tracking-widest">
+          <Wallet size={14} /> Dein Tipp-Guthaben
+        </div>
+        <p className="text-4xl font-extrabold mt-1 tabular-nums">{fmt(tipBalance)}</p>
+        <p className="text-slate-500 text-sm">Punkte</p>
+      </div>
+
+      {/* Nächstes Spiel */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+        <div className="px-4 py-2.5 flex items-center justify-between border-b border-slate-800">
+          <span className="text-xs uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+            <Circle size={8} className="fill-red-500 text-red-500" /> Nächstes Spiel
+          </span>
+          <StatusBadge status={next.status} />
+        </div>
+        <Matchup home={next.home} away={next.away} big />
+        <div className="px-4 pb-4">
+          <div className="flex items-center justify-center gap-2 text-sm text-slate-300 mb-3">
+            <Clock size={14} className="text-red-500" />
+            {remaining > 0 ? (
+              <>Tipps schliessen in <span className="font-bold tabular-nums text-white">{fmtCountdown(remaining)}</span></>
+            ) : (
+              <span className="text-slate-500">Tipps geschlossen 🔒</span>
+            )}
+          </div>
+          {myBet ? (
+            <div className="rounded-xl bg-slate-800/70 border border-slate-700 p-3 flex items-center justify-between">
+              <span className="text-sm text-slate-400">Dein Tipp</span>
+              <span className="font-semibold">
+                {TEAMS[myBet.team].tag} {TEAMS[myBet.team].short} · {fmt(myBet.amount)}
+              </span>
+            </div>
+          ) : remaining > 0 ? (
+            <button
+              onClick={() => onTip(next.id)}
+              className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.99] transition rounded-xl py-3 font-bold tracking-wide focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+            >
+              JETZT TIPPEN
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Gruppe + Rangliste */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-widest">
+            <Users size={13} /> Gruppe
+          </div>
+          <p className="font-semibold mt-2 leading-tight">Hockeyrunde 2026/27</p>
+          <p className="text-slate-500 text-sm">{MEMBERS.length} Mitglieder</p>
+        </div>
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+          <div className="flex items-center gap-1.5 text-slate-400 text-xs uppercase tracking-widest">
+            <Brain size={13} /> Fantasy-Team
+          </div>
+          <p className="font-semibold mt-2 tabular-nums">{fmt(spent)} <span className="text-slate-500 font-normal">/ {fmt(budget)}</span></p>
+          <div className="h-1.5 rounded-full bg-slate-800 mt-2 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-500 to-red-500" style={{ width: `${(spent / budget) * 100}%` }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Rangliste */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
+            <Trophy size={14} className="text-yellow-500" /> Rangliste
+          </span>
+          <button onClick={() => onGoto("rank")} className="text-xs text-red-400 flex items-center gap-0.5">
+            Alle <ChevronRight size={12} />
+          </button>
+        </div>
+        <div className="space-y-2">
+          {ranking.slice(0, 4).map((m, i) => (
+            <div key={m.name} className="flex items-center gap-3">
+              <span className={`w-6 text-center font-bold ${i === 0 ? "text-yellow-500" : "text-slate-500"}`}>{i + 1}</span>
+              <span className={`flex-1 ${m.name === ME ? "text-white font-semibold" : "text-slate-300"}`}>
+                {m.name} {m.name === ME && "· du"}
+              </span>
+              <span className="tabular-nums text-slate-300 font-medium">{fmt(m.tipPts)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Spiele                                                             */
+/* ================================================================== */
+function GamesView({ tick, games, myBets, onTip }) {
+  return (
+    <div className="px-4 pt-6 space-y-4">
+      <h1 className="text-2xl font-bold tracking-tight">Spiele</h1>
+      <p className="text-slate-400 text-sm -mt-2">National League · Runde 12</p>
+      <div className="space-y-3">
+        {games.map((g) => (
+          <GameCard key={g.id} game={g} tick={tick} myBet={myBets[g.id]} onTip={onTip} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GameCard({ game, tick, myBet, onTip }) {
+  const lockAt = game.start - TIP_LOCK_MS;
+  const remaining = lockAt - tick;
+  const open = game.status === "OPEN" && remaining > 0;
+
+  const pool = game.groupBets.reduce((s, b) => s + b.amount, 0);
+  const homePool = game.groupBets.filter((b) => b.team === game.home).reduce((s, b) => s + b.amount, 0);
+  const awayPool = pool - homePool;
+
+  return (
+    <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden">
+      <div className="px-4 py-2 flex items-center justify-between border-b border-slate-800">
+        <span className="text-[11px] text-slate-400">
+          {new Date(game.start).toLocaleString("de-CH", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+        </span>
+        <StatusBadge status={open ? "OPEN" : game.status} />
+      </div>
+
+      <Matchup home={game.home} away={game.away} homeScore={game.homeScore} awayScore={game.awayScore} />
+
+      {/* Pool */}
+      {pool > 0 && (
+        <div className="px-4 pb-3">
+          <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+            <span>{TEAMS[game.home].short} {Math.round((homePool / pool) * 100)}%</span>
+            <span>Pool {fmt(pool)}</span>
+            <span>{Math.round((awayPool / pool) * 100)}% {TEAMS[game.away].short}</span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden flex bg-slate-800">
+            <div style={{ width: `${(homePool / pool) * 100}%`, background: TEAMS[game.home].color }} />
+            <div style={{ width: `${(awayPool / pool) * 100}%`, background: TEAMS[game.away].color }} />
+          </div>
+        </div>
+      )}
+
+      {/* Aktion */}
+      <div className="px-4 pb-4">
+        {game.status === "FINISHED" ? (
+          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-3 text-sm flex items-center justify-between">
+            <span className="text-slate-400">Endstand · Sieger {TEAMS[game.result].short}</span>
+            {myBet && (
+              <span className={myBet.won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
+                {myBet.won ? `+${fmt(myBet.payout)}` : `−${fmt(myBet.amount)}`}
+              </span>
+            )}
+          </div>
+        ) : myBet ? (
+          <div className="rounded-xl bg-slate-800/60 border border-slate-700 p-3 text-sm flex items-center justify-between">
+            <span className="text-slate-400">Dein Tipp</span>
+            <span className="font-semibold">{TEAMS[myBet.team].tag} {TEAMS[myBet.team].short} · {fmt(myBet.amount)}</span>
+          </div>
+        ) : open ? (
+          <button
+            onClick={() => onTip(game.id)}
+            className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.99] transition rounded-xl py-2.5 font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            Tippen · schliesst in {fmtCountdown(remaining)}
+          </button>
+        ) : (
+          <div className="rounded-xl bg-slate-800/40 border border-slate-800 p-2.5 text-center text-sm text-slate-500 flex items-center justify-center gap-1.5">
+            <Lock size={14} /> Tipps geschlossen
+          </div>
+        )}
+      </div>
+
+      {/* Gruppen-Tipps */}
+      {game.groupBets.length > 0 && (
+        <div className="px-4 pb-4">
+          <p className="text-[11px] uppercase tracking-widest text-slate-500 mb-2">Tipps der Gruppe</p>
+          <div className="space-y-1.5">
+            {game.groupBets.map((b, i) => (
+              <div key={i} className="flex items-center justify-between text-sm">
+                <span className={b.user === ME ? "text-white font-medium" : "text-slate-300"}>{b.user}</span>
+                <span className="flex items-center gap-2 text-slate-300">
+                  <span>{TEAMS[b.team].tag} {TEAMS[b.team].short}</span>
+                  <span className="tabular-nums text-slate-400">{fmt(b.amount)}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* Matchup-Anzeige (Scoreboard-Stil) */
+function Matchup({ home, away, homeScore, awayScore, big }) {
+  const H = TEAMS[home], A = TEAMS[away];
+  const hasScore = homeScore != null;
+  return (
+    <div className={`flex items-center justify-between px-5 ${big ? "py-5" : "py-4"}`}>
+      <TeamBadge team={H} size={big ? "lg" : "md"} />
+      <div className="text-center px-2">
+        {hasScore ? (
+          <div className="text-2xl font-extrabold tabular-nums">{homeScore} : {awayScore}</div>
+        ) : (
+          <div className="text-slate-500 font-bold text-lg">VS</div>
+        )}
+      </div>
+      <TeamBadge team={A} size={big ? "lg" : "md"} align="right" />
+    </div>
+  );
+}
+function TeamBadge({ team, size = "md", align = "left" }) {
+  const dim = size === "lg" ? "h-12 w-12 text-2xl" : "h-10 w-10 text-xl";
+  return (
+    <div className={`flex items-center gap-2.5 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+      <div className={`${dim} rounded-xl grid place-items-center`} style={{ background: team.color + "22", border: `1px solid ${team.color}55` }}>
+        <span>{team.tag}</span>
+      </div>
+      <div className={align === "right" ? "text-right" : ""}>
+        <p className="font-bold leading-tight text-sm">{team.short}</p>
+        <p className="text-[11px] text-slate-500 leading-tight">{team.name}</p>
+      </div>
+    </div>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    OPEN: { t: "Offen", c: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
+    LOCKED: { t: "Geschlossen", c: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
+    LIVE: { t: "Live", c: "bg-red-500/15 text-red-400 border-red-500/30" },
+    FINISHED: { t: "Beendet", c: "bg-slate-500/15 text-slate-400 border-slate-500/30" },
+    UPCOMING: { t: "Bald", c: "bg-blue-500/15 text-blue-400 border-blue-500/30" },
+  };
+  const s = map[status] || map.UPCOMING;
+  return (
+    <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full border ${s.c} flex items-center gap-1`}>
+      {status === "LIVE" && <Circle size={7} className="fill-red-500 text-red-500 animate-pulse" />}
+      {s.t}
+    </span>
+  );
+}
+
+/* ================================================================== */
+/*  Tipp-Modal                                                         */
+/* ================================================================== */
+function TipModal({ game, balance, tick, existing, onClose, onConfirm }) {
+  const [team, setTeam] = useState(null);
+  const [amount, setAmount] = useState(0);
+  const [custom, setCustom] = useState("");
+  const [confirming, setConfirming] = useState(false);
+
+  const lockAt = game.start - TIP_LOCK_MS;
+  const remaining = lockAt - tick;
+  const locked = remaining <= 0;
+
+  const quick = [10, 25, 50, 100, 250, 500];
+  const valid = team && amount > 0 && amount <= balance && !locked;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 pb-8" style={{ animation: "slideup .2s ease" }}>
+        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
+
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-bold text-lg">Wer gewinnt?</h2>
+          <button onClick={onClose} className="text-slate-500 p-1"><X size={20} /></button>
+        </div>
+
+        {locked && (
+          <div className="mb-4 rounded-xl bg-red-500/10 border border-red-500/30 p-3 text-sm text-red-300 flex items-center gap-2">
+            <Lock size={16} /> Tippfrist abgelaufen (60-Min-Regel).
+          </div>
+        )}
+
+        {/* Teamwahl */}
+        <div className="grid grid-cols-2 gap-3 mb-5">
+          {[game.home, game.away].map((t) => {
+            const T = TEAMS[t];
+            const sel = team === t;
+            return (
+              <button
+                key={t}
+                disabled={locked}
+                onClick={() => setTeam(t)}
+                className={`rounded-2xl p-4 border-2 transition text-center disabled:opacity-40 ${
+                  sel ? "border-red-500 bg-red-500/10" : "border-slate-700 bg-slate-800/40"
+                }`}
+              >
+                <div className="text-2xl mb-1">{T.tag}</div>
+                <div className="font-bold text-sm">{T.short}</div>
+                <div className="text-[11px] text-slate-500">{T.name}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Einsatz */}
+        <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">Einsatz</p>
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {quick.map((q) => (
+            <button
+              key={q}
+              disabled={locked || q > balance}
+              onClick={() => { setAmount(q); setCustom(""); }}
+              className={`rounded-xl py-2.5 font-semibold text-sm border transition disabled:opacity-30 ${
+                amount === q && !custom ? "border-red-500 bg-red-500/10 text-white" : "border-slate-700 bg-slate-800/40 text-slate-300"
+              }`}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+        <input
+          type="number" inputMode="numeric" placeholder="Eigener Betrag"
+          value={custom} disabled={locked}
+          onChange={(e) => {
+            setCustom(e.target.value);
+            setAmount(Math.max(0, parseInt(e.target.value || "0", 10)));
+          }}
+          className="w-full rounded-xl bg-slate-800 border border-slate-700 px-4 py-3 mb-4 text-white placeholder:text-slate-500 focus:outline-none focus:border-red-500"
+        />
+
+        {/* Guthaben-Rechnung */}
+        <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-3 mb-5 text-sm space-y-1">
+          <Row l="Aktuelles Guthaben" v={fmt(balance)} />
+          <Row l="Einsatz" v={amount ? fmt(amount) : "0"} accent />
+          <div className="border-t border-slate-700 my-1" />
+          <Row l="Verbleibend" v={fmt(Math.max(0, balance - amount))} bold />
+        </div>
+
+        {/* Bestätigen */}
+        {!confirming ? (
+          <button
+            disabled={!valid}
+            onClick={() => setConfirming(true)}
+            className="w-full bg-red-600 hover:bg-red-500 disabled:bg-slate-700 disabled:text-slate-500 rounded-xl py-3.5 font-bold tracking-wide transition"
+          >
+            TIPP ABGEBEN
+          </button>
+        ) : (
+          <div className="space-y-3">
+            <p className="text-center text-sm text-slate-300">
+              Du setzt <b className="text-white">{fmt(amount)}</b> Punkte auf <b className="text-white">{TEAMS[team].name}</b>.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => setConfirming(false)} className="rounded-xl py-3 border border-slate-700 font-semibold text-slate-300">
+                Abbrechen
+              </button>
+              <button onClick={() => onConfirm(game.id, team, amount)} className="rounded-xl py-3 bg-emerald-600 hover:bg-emerald-500 font-semibold flex items-center justify-center gap-2">
+                <Check size={18} /> Bestätigen
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <style>{`@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+function Row({ l, v, accent, bold }) {
+  return (
+    <div className="flex justify-between">
+      <span className="text-slate-400">{l}</span>
+      <span className={`tabular-nums ${accent ? "text-red-400" : ""} ${bold ? "font-bold text-white" : "text-slate-200"}`}>{v}</span>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Fantasy                                                            */
+/* ================================================================== */
+function FantasyView({ roster, spent, budget, onToggle, onOpenPlayer }) {
+  const [sub, setSub] = useState("team"); // team | market
+  const remaining = budget - spent;
+  const rosterPlayers = roster.map((id) => PLAYERS.find((p) => p.id === id));
+  const byPos = (pos) => rosterPlayers.filter((p) => p.pos === pos);
+
+  return (
+    <div className="px-4 pt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight">Mein Fantasy-Team 🧠</h1>
+      </div>
+
+      {/* Budget-Leiste */}
+      <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-4">
+        <div className="grid grid-cols-3 text-center">
+          <Stat l="Budget" v={fmt(budget)} />
+          <Stat l="Ausgegeben" v={fmt(spent)} />
+          <Stat l="Übrig" v={fmt(remaining)} accent={remaining < 0} good={remaining >= 0} />
+        </div>
+        <div className="h-2 rounded-full bg-slate-800 mt-3 overflow-hidden">
+          <div className={`h-full ${remaining < 0 ? "bg-red-500" : "bg-gradient-to-r from-blue-500 to-emerald-500"}`} style={{ width: `${Math.min(100, (spent / budget) * 100)}%` }} />
+        </div>
+      </div>
+
+      {/* Umschalter */}
+      <div className="grid grid-cols-2 gap-2 bg-slate-900 border border-slate-800 rounded-xl p-1">
+        {[["team", "Aufstellung"], ["market", "Transfermarkt"]].map(([id, label]) => (
+          <button key={id} onClick={() => setSub(id)}
+            className={`py-2 rounded-lg text-sm font-semibold transition ${sub === id ? "bg-red-600 text-white" : "text-slate-400"}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {sub === "team" ? (
+        <>
+          {/* Eisfeld */}
+          <IceRink byPos={byPos} onOpenPlayer={onOpenPlayer} />
+          {/* Kaderregeln */}
+          <div className="space-y-3">
+            {["GOALIE", "DEFENDER", "FORWARD"].map((pos) => (
+              <RosterSlot key={pos} pos={pos} players={byPos(pos)} onOpenPlayer={onOpenPlayer} onToggle={onToggle} />
+            ))}
+          </div>
+        </>
+      ) : (
+        <Market roster={roster} onOpenPlayer={onOpenPlayer} onToggle={onToggle} />
+      )}
+    </div>
+  );
+}
+
+function Stat({ l, v, accent, good }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-widest text-slate-500">{l}</p>
+      <p className={`text-lg font-bold tabular-nums ${accent ? "text-red-400" : good ? "text-emerald-400" : "text-white"}`}>{v}</p>
+    </div>
+  );
+}
+
+/* Eisfeld-Aufstellung (Signatur-Element) */
+function IceRink({ byPos, onOpenPlayer }) {
+  const dot = (p) => (
+    <button key={p.id} onClick={() => onOpenPlayer(p.id)}
+      className="flex flex-col items-center gap-1 focus:outline-none">
+      <div className="h-11 w-11 rounded-full grid place-items-center text-xs font-bold shadow-lg"
+        style={{ background: TEAMS[p.team].color, border: "2px solid rgba(255,255,255,.25)" }}>
+        {p.num}
+      </div>
+      <span className="text-[10px] text-slate-200 leading-tight max-w-[60px] truncate">{p.last}</span>
+    </button>
+  );
+  const empty = (k) => (
+    <div key={k} className="flex flex-col items-center gap-1 opacity-40">
+      <div className="h-11 w-11 rounded-full border-2 border-dashed border-slate-600 grid place-items-center">
+        <Plus size={16} className="text-slate-600" />
+      </div>
+      <span className="text-[10px] text-slate-600">frei</span>
+    </div>
+  );
+  const line = (pos, n) => {
+    const ps = byPos(pos);
+    return Array.from({ length: n }).map((_, i) => (ps[i] ? dot(ps[i]) : empty(`${pos}${i}`)));
+  };
+  return (
+    <div className="rounded-2xl overflow-hidden border border-blue-900/40 relative"
+      style={{ background: "linear-gradient(180deg,#0c1a33,#0a1120)" }}>
+      {/* Eis-Linien */}
+      <div className="absolute inset-x-0 top-1/2 h-px bg-red-500/40" />
+      <div className="absolute inset-x-0 top-[30%] h-px bg-blue-400/25" />
+      <div className="absolute inset-x-0 top-[70%] h-px bg-blue-400/25" />
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 rounded-full border border-blue-400/20" />
+      <div className="relative py-5 space-y-5">
+        <div className="flex justify-around px-6">{line("FORWARD", 3)}</div>
+        <div className="flex justify-around px-10">{line("DEFENDER", 2)}</div>
+        <div className="flex justify-center">{line("GOALIE", 1)}</div>
+      </div>
+    </div>
+  );
+}
+
+function RosterSlot({ pos, players, onOpenPlayer, onToggle }) {
+  const max = ROSTER_RULES[pos];
+  return (
+    <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-semibold flex items-center gap-2">
+          {pos === "GOALIE" ? "🥅" : pos === "DEFENDER" ? "🛡️" : "🏒"} {POS_LABEL[pos]}
+        </span>
+        <span className="text-xs text-slate-500 tabular-nums">{players.length} / {max}</span>
+      </div>
+      <div className="space-y-2">
+        {players.map((p) => (
+          <div key={p.id} className="flex items-center gap-3">
+            <button onClick={() => onOpenPlayer(p.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+              <span className="h-8 w-8 rounded-lg grid place-items-center text-[11px] font-bold flex-shrink-0"
+                style={{ background: TEAMS[p.team].color + "33", color: "#fff" }}>{p.num}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium truncate">{p.name}</span>
+                <span className="block text-[11px] text-slate-500">{TEAMS[p.team].short} · {p.pop} Beliebtheit</span>
+              </span>
+            </button>
+            <span className="tabular-nums text-sm text-slate-300 flex-shrink-0">{fmt(p.price)}</span>
+            <button onClick={() => onToggle(p.id)} className="text-slate-500 hover:text-red-400 p-1 flex-shrink-0">
+              <Minus size={16} />
+            </button>
+          </div>
+        ))}
+        {players.length === 0 && <p className="text-sm text-slate-600">Noch keine Spieler – im Transfermarkt auswählen.</p>}
+      </div>
+    </div>
+  );
+}
+
+/* Transfermarkt */
+function Market({ roster, onOpenPlayer, onToggle }) {
+  const [filter, setFilter] = useState("ALL");
+  const risers = [...PLAYERS].sort((a, b) => b.trend - a.trend).slice(0, 3);
+  const fallers = [...PLAYERS].sort((a, b) => a.trend - b.trend).slice(0, 3);
+  const mostPicked = [...PLAYERS].sort((a, b) => b.teamsCount - a.teamsCount)[0];
+
+  const list = PLAYERS.filter((p) => filter === "ALL" || p.pos === filter).sort((a, b) => b.pop - a.pop);
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+        <p className="text-xs uppercase tracking-widest text-emerald-400 mb-2 flex items-center gap-1.5">
+          <TrendingUp size={14} /> Grösste Aufsteiger
+        </p>
+        {risers.map((p) => (
+          <MoverRow key={p.id} p={p} onOpenPlayer={onOpenPlayer} />
+        ))}
+      </div>
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+        <p className="text-xs uppercase tracking-widest text-red-400 mb-2 flex items-center gap-1.5">
+          <TrendingDown size={14} /> Grösste Verlierer
+        </p>
+        {fallers.map((p) => (
+          <MoverRow key={p.id} p={p} onOpenPlayer={onOpenPlayer} />
+        ))}
+      </div>
+      <div className="rounded-2xl bg-gradient-to-br from-red-950/40 to-slate-900 border border-red-900/40 p-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-orange-400 flex items-center gap-1.5"><Flame size={14} /> Meistgewählt</p>
+          <p className="font-bold mt-1">{mostPicked.name}</p>
+          <p className="text-sm text-slate-400">{mostPicked.teamsCount} Fantasy-Teams</p>
+        </div>
+        <button onClick={() => onOpenPlayer(mostPicked.id)} className="text-slate-400"><ChevronRight /></button>
+      </div>
+
+      {/* Filter + Liste */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {[["ALL", "Alle"], ["GOALIE", "Torhüter"], ["DEFENDER", "Verteidiger"], ["FORWARD", "Stürmer"]].map(([id, l]) => (
+          <button key={id} onClick={() => setFilter(id)}
+            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border ${filter === id ? "bg-red-600 border-red-600 text-white" : "border-slate-700 text-slate-400"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {list.map((p) => (
+          <div key={p.id} className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center gap-3">
+            <button onClick={() => onOpenPlayer(p.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+              <span className="h-9 w-9 rounded-lg grid place-items-center text-xs font-bold flex-shrink-0"
+                style={{ background: TEAMS[p.team].color + "33" }}>{p.num}</span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium truncate">{p.name}</span>
+                <span className="block text-[11px] text-slate-500">{TEAMS[p.team].short} · {POS_LABEL[p.pos]}</span>
+              </span>
+            </button>
+            <div className="text-right flex-shrink-0">
+              <div className="flex items-center gap-1 justify-end">
+                <PopDot v={p.pop} />
+                <span className="text-sm font-semibold tabular-nums">{p.pop}</span>
+              </div>
+              <span className="text-[11px] text-slate-400 tabular-nums">{fmt(p.price)} Pkt</span>
+            </div>
+            <button onClick={() => onToggle(p.id)}
+              className={`h-8 w-8 rounded-lg grid place-items-center flex-shrink-0 ${roster.includes(p.id) ? "bg-red-600" : "bg-slate-700 hover:bg-slate-600"}`}>
+              {roster.includes(p.id) ? <Check size={16} /> : <Plus size={16} />}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+function MoverRow({ p, onOpenPlayer }) {
+  const up = p.trend >= 0;
+  return (
+    <button onClick={() => onOpenPlayer(p.id)} className="w-full flex items-center justify-between py-1.5 text-left">
+      <span className="flex items-center gap-2 min-w-0">
+        <span className="h-7 w-7 rounded-md grid place-items-center text-[10px] font-bold flex-shrink-0" style={{ background: TEAMS[p.team].color + "33" }}>{p.num}</span>
+        <span className="text-sm truncate">{p.name}</span>
+      </span>
+      <span className={`text-sm font-semibold tabular-nums ${up ? "text-emerald-400" : "text-red-400"}`}>
+        {up ? "+" : ""}{p.trend}%
+      </span>
+    </button>
+  );
+}
+function PopDot({ v }) {
+  const c = v >= 80 ? "#10b981" : v >= 60 ? "#3b82f6" : v >= 40 ? "#eab308" : "#ef4444";
+  return <span className="h-2 w-2 rounded-full inline-block" style={{ background: c }} />;
+}
+
+/* ================================================================== */
+/*  Rangliste                                                          */
+/* ================================================================== */
+function RankingView({ roster, favorite }) {
+  const [board, setBoard] = useState("tip");
+  const tabs = [
+    ["tip", "🏆 Tipps"],
+    ["fantasy", "🧠 Fantasy"],
+    ["pop", "❤️ Beliebtheit"],
+    ["streak", "🔥 Serie"],
+  ];
+
+  const tip = [...MEMBERS].sort((a, b) => b.tipPts - a.tipPts);
+  const streak = [...MEMBERS].sort((a, b) => b.streak - a.streak);
+  // Fantasy & Pop: aus Mitgliedern deterministisch abgeleitet
+  const fantasy = MEMBERS.map((m, i) => ({ ...m, val: 148 + ((i * 37) % 60) })).sort((a, b) => b.val - a.val);
+  const pop = MEMBERS.map((m, i) => ({ ...m, val: 68 + ((i * 53) % 28) })).sort((a, b) => b.val - a.val);
+
+  return (
+    <div className="px-4 pt-6 space-y-4">
+      <h1 className="text-2xl font-bold tracking-tight">Rangliste</h1>
+      <p className="text-slate-400 text-sm -mt-2">Hockeyrunde 2026/27 · Saison 2026/27</p>
+
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {tabs.map(([id, l]) => (
+          <button key={id} onClick={() => setBoard(id)}
+            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap border ${board === id ? "bg-red-600 border-red-600 text-white" : "border-slate-700 text-slate-400"}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 divide-y divide-slate-800">
+        {board === "tip" && tip.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${fmt(m.tipPts)} Pkt`} />)}
+        {board === "fantasy" && fantasy.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${m.val} Fantasy-Pkt`} />)}
+        {board === "pop" && pop.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`Ø ${m.val} Beliebtheit`} />)}
+        {board === "streak" && streak.map((m, i) => <RankRow key={m.name} i={i} name={m.name} val={`${m.streak} in Serie`} />)}
+      </div>
+    </div>
+  );
+}
+function RankRow({ i, name, val }) {
+  const medal = ["🥇", "🥈", "🥉"][i];
+  return (
+    <div className="flex items-center gap-3 px-4 py-3">
+      <span className="w-7 text-center font-bold text-slate-400">{medal || i + 1}</span>
+      <div className="h-8 w-8 rounded-full bg-slate-700 grid place-items-center text-sm font-bold flex-shrink-0">{name[0]}</div>
+      <span className={`flex-1 ${name === ME ? "text-white font-semibold" : "text-slate-300"}`}>{name}{name === ME && " · du"}</span>
+      <span className="tabular-nums text-sm text-slate-300">{val}</span>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Profil                                                             */
+/* ================================================================== */
+function ProfileView({ tipBalance, favorite, onOpenPlayer, myBets, games }) {
+  const fav = PLAYERS.find((p) => p.id === favorite);
+  const achievements = [
+    { icon: "🔥", name: "Hot Hand", desc: "5 richtige Tipps hintereinander", got: true },
+    { icon: "❤️", name: "Fan", desc: "Lieblingsspieler ausgewählt", got: true },
+    { icon: "🧠", name: "Fantasy Manager", desc: "Fantasy-Team erstellt", got: true },
+    { icon: "🎯", name: "Scharfschütze", desc: "10 richtige Tipps", got: false },
+    { icon: "📈", name: "Scout", desc: "Spieler vor grossem Anstieg gewählt", got: false },
+    { icon: "🏆", name: "Champion", desc: "Saison gewonnen", got: false },
+  ];
+  const myTips = games.filter((g) => myBets[g.id]);
+
+  return (
+    <div className="px-4 pt-6 space-y-4">
+      <div className="flex items-center gap-4">
+        <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 grid place-items-center text-2xl font-extrabold">L</div>
+        <div>
+          <h1 className="text-2xl font-bold">Luca</h1>
+          <p className="text-slate-400 text-sm">Hockeyrunde 2026/27 · Admin</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">Tipp-Guthaben</p>
+          <p className="text-xl font-bold tabular-nums mt-1">{fmt(tipBalance)}</p>
+        </div>
+        <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">Siegesserie</p>
+          <p className="text-xl font-bold mt-1 flex items-center gap-1"><Flame size={18} className="text-orange-500" /> 5</p>
+        </div>
+      </div>
+
+      {/* Lieblingsspieler */}
+      {fav && (
+        <button onClick={() => onOpenPlayer(fav.id)} className="w-full rounded-2xl bg-gradient-to-br from-red-950/40 to-slate-900 border border-red-900/40 p-4 flex items-center gap-3 text-left">
+          <Heart size={20} className="fill-red-500 text-red-500 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] uppercase tracking-widest text-red-400">Lieblingsspieler</p>
+            <p className="font-bold truncate">{fav.name}</p>
+            <p className="text-sm text-slate-400">{TEAMS[fav.team].short} · {fav.favCount} Fans in der Gruppe</p>
+          </div>
+          <ChevronRight className="text-slate-500 flex-shrink-0" />
+        </button>
+      )}
+
+      {/* Meine Tipps */}
+      <div>
+        <h2 className="font-semibold mb-2 flex items-center gap-2"><Target size={16} className="text-red-500" /> Meine Tipps</h2>
+        <div className="space-y-2">
+          {myTips.map((g) => {
+            const b = myBets[g.id];
+            const finished = g.status === "FINISHED";
+            const won = g.myBet?.won;
+            return (
+              <div key={g.id} className="rounded-xl bg-slate-900 border border-slate-800 p-3 flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-medium">{TEAMS[g.home].short} – {TEAMS[g.away].short}</p>
+                  <p className="text-slate-500 text-xs">{TEAMS[b.team].tag} {TEAMS[b.team].short} · {fmt(b.amount)}</p>
+                </div>
+                {finished ? (
+                  <span className={won ? "text-emerald-400 font-semibold" : "text-red-400 font-semibold"}>
+                    {won ? `✅ +${fmt(g.myBet.payout)}` : `❌ −${fmt(b.amount)}`}
+                  </span>
+                ) : (
+                  <span className="text-slate-400">⏳ Offen</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Achievements */}
+      <div>
+        <h2 className="font-semibold mb-2 flex items-center gap-2"><Award size={16} className="text-yellow-500" /> Achievements</h2>
+        <div className="grid grid-cols-3 gap-2">
+          {achievements.map((a) => (
+            <div key={a.name} className={`rounded-xl border p-3 text-center ${a.got ? "bg-slate-900 border-slate-700" : "bg-slate-900/40 border-slate-800 opacity-50"}`}>
+              <div className="text-2xl">{a.icon}</div>
+              <p className="text-[11px] font-medium mt-1 leading-tight">{a.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <button className="w-full rounded-xl border border-slate-800 py-3 text-slate-400 text-sm mt-2">Abmelden</button>
+      <p className="text-center text-[11px] text-slate-600 pt-1">Demo · Daten werden nicht gespeichert</p>
+    </div>
+  );
+}
+
+/* ================================================================== */
+/*  Spieler-Modal (Detailseite)                                        */
+/* ================================================================== */
+function PlayerModal({ player, isFav, inRoster, onFav, onToggle, onClose }) {
+  const p = player;
+  const T = TEAMS[p.team];
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center">
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 pb-8" style={{ animation: "slideup .2s ease" }}>
+        <div className="w-10 h-1 bg-slate-700 rounded-full mx-auto mb-4" />
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-500"><X size={20} /></button>
+
+        <div className="flex items-center gap-4 mb-5">
+          <div className="h-16 w-16 rounded-2xl grid place-items-center text-2xl font-extrabold" style={{ background: T.color }}>
+            {p.num}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">{p.name}</h2>
+            <p className="text-slate-400 text-sm">{T.name} · {POS_LABEL[p.pos]}</p>
+          </div>
+        </div>
+
+        {/* Popularity gross */}
+        <div className="rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 p-4 mb-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-widest text-slate-500">Popularity Score</p>
+              <p className="text-4xl font-extrabold tabular-nums">{p.pop}<span className="text-lg text-slate-500">/100</span></p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] uppercase tracking-widest text-slate-500">Fantasy-Preis</p>
+              <p className="text-2xl font-bold tabular-nums text-red-400">{fmt(p.price)}</p>
+            </div>
+          </div>
+          <div className="h-2 rounded-full bg-slate-800 mt-3 overflow-hidden">
+            <div className="h-full" style={{ width: `${p.pop}%`, background: p.pop >= 80 ? "#10b981" : p.pop >= 60 ? "#3b82f6" : p.pop >= 40 ? "#eab308" : "#ef4444" }} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-5 text-sm">
+          <MiniStat icon={<TrendingUp size={15} className={p.trend >= 0 ? "text-emerald-400" : "text-red-400"} />} l="Diese Woche" v={`${p.trend >= 0 ? "+" : ""}${p.trend}%`} />
+          <MiniStat icon={<Users size={15} className="text-blue-400" />} l="Fantasy-Teams" v={p.teamsCount} />
+          <MiniStat icon={<Heart size={15} className="text-red-400" />} l="Lieblingsspieler" v={`${p.favCount} Mitgl.`} />
+          <MiniStat icon={<Trophy size={15} className="text-yellow-400" />} l="Spieler des Spiels" v={`${p.potg}×`} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <button onClick={onFav}
+            className={`rounded-xl py-3 font-semibold flex items-center justify-center gap-2 border ${isFav ? "bg-red-600 border-red-600" : "border-slate-700 text-slate-300"}`}>
+            <Heart size={18} className={isFav ? "fill-white" : ""} /> {isFav ? "Liebling" : "Als Liebling"}
+          </button>
+          <button onClick={onToggle}
+            className={`rounded-xl py-3 font-semibold flex items-center justify-center gap-2 ${inRoster ? "bg-slate-700" : "bg-emerald-600"}`}>
+            {inRoster ? <><Minus size={18} /> Entfernen</> : <><Plus size={18} /> Ins Team</>}
+          </button>
+        </div>
+      </div>
+      <style>{`@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}`}</style>
+    </div>
+  );
+}
+function MiniStat({ icon, l, v }) {
+  return (
+    <div className="rounded-xl bg-slate-800/50 border border-slate-700 p-3">
+      <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">{icon}{l}</div>
+      <p className="font-bold mt-0.5 tabular-nums">{v}</p>
+    </div>
+  );
+}
